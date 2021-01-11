@@ -235,6 +235,44 @@ namespace Test
         }
 
         [Test]
+        public static void EntrapmentFastaTest()
+        {
+            List<Protein> proteins = ProteinDbLoader.LoadProteinFasta(@"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes_210111.fasta", true, DecoyType.Reverse, false, out var a,
+                ProteinDbLoader.UniprotAccessionRegex, ProteinDbLoader.UniprotFullNameRegex, ProteinDbLoader.UniprotNameRegex, ProteinDbLoader.UniprotGeneNameRegex,
+                ProteinDbLoader.UniprotOrganismRegex);
+
+            List<Protein> entrapmentProteins = new List<Protein>();
+            foreach (Protein protein in proteins)
+            {
+                char[] proteinAminoacids = protein.BaseSequence.ToCharArray();
+                string trimmedSequence = protein.BaseSequence.Replace("K", "");
+                trimmedSequence = trimmedSequence.Replace("R", "");
+
+                char[] trimmedArray = trimmedSequence.ToCharArray();
+
+                Random rnd = new Random();
+                char[] myRandomTrimmedArray = trimmedArray.OrderBy(x => rnd.Next()).ToArray();
+
+                int myIndex = 0;
+                for (int i = 0; i < proteinAminoacids.Length; i++)
+                {
+                    if(proteinAminoacids[i] != 'K' && proteinAminoacids[i] != 'R')
+                    {
+                        proteinAminoacids[i] = myRandomTrimmedArray[myIndex];
+                        myIndex++;
+                    }
+                }
+
+                string trapSequence = new string(proteinAminoacids);
+
+                entrapmentProteins.Add(new Protein(trapSequence, "TRAP_" + protein.Accession, organism: "TRAP"));
+            }
+
+            ProteinDbWriter.WriteFastaDatabase(entrapmentProteins, @"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes_210111_TRAP.fasta", "|");
+        }
+
+
+        [Test]
         public static void BadFastaTest()
         {
             ProteinDbLoader.LoadProteinFasta(Path.Combine(TestContext.CurrentContext.TestDirectory, "DatabaseTests", @"bad4.fasta"), true, DecoyType.Reverse, false, out var a,
