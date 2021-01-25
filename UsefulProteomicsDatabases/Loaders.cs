@@ -84,24 +84,24 @@ namespace UsefulProteomicsDatabases
 
         public static void UpdatePsiMod(string psimodLocation)
         {
-            DownloadPsiMod(psimodLocation);
-            if (!File.Exists(psimodLocation))
-            {
-                Console.WriteLine("PSI-MOD database did not exist, writing to disk");
-                File.Move(psimodLocation + ".temp", psimodLocation);
-                return;
-            }
-            if (FilesAreEqual_Hash(psimodLocation + ".temp", psimodLocation))
-            {
-                Console.WriteLine("PSI-MOD database is up to date, doing nothing");
-                File.Delete(psimodLocation + ".temp");
-            }
-            else
-            {
-                Console.WriteLine("PSI-MOD database updated, saving old version as backup");
-                File.Move(psimodLocation, psimodLocation + DateTime.Now.ToString("dd-MMM-yyyy-HH-mm-ss"));
-                File.Move(psimodLocation + ".temp", psimodLocation);
-            }
+            //DownloadPsiMod(psimodLocation);
+            //if (!File.Exists(psimodLocation))
+            //{
+            //    Console.WriteLine("PSI-MOD database did not exist, writing to disk");
+            //    File.Move(psimodLocation + ".temp", psimodLocation);
+            //    return;
+            //}
+            //if (FilesAreEqual_Hash(psimodLocation + ".temp", psimodLocation))
+            //{
+            //    Console.WriteLine("PSI-MOD database is up to date, doing nothing");
+            //    File.Delete(psimodLocation + ".temp");
+            //}
+            //else
+            //{
+            //    Console.WriteLine("PSI-MOD database updated, saving old version as backup");
+            //    File.Move(psimodLocation, psimodLocation + DateTime.Now.ToString("dd-MMM-yyyy-HH-mm-ss"));
+            //    File.Move(psimodLocation + ".temp", psimodLocation);
+            //}
         }
 
         public static Dictionary<string, int> GetFormalChargesDictionary(obo psiModDeserialized)
@@ -172,10 +172,10 @@ namespace UsefulProteomicsDatabases
 
         private static void DownloadPsiMod(string psimodLocation)
         {
-            using (WebClient Client = new WebClient())
-            {
-                Client.DownloadFile(@"https://github.com/smith-chem-wisc/psi-mod-CV/blob/master/PSI-MOD.obo.xml?raw=true", psimodLocation + ".temp");
-            }
+            //using (WebClient Client = new WebClient())
+            //{
+            //    Client.DownloadFile(@"https://github.com/smith-chem-wisc/psi-mod-CV/blob/master/PSI-MOD.obo.xml?raw=true", psimodLocation + ".temp");
+            //}
         }
 
         private static void DownloadUnimod(string unimodLocation)

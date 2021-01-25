@@ -237,7 +237,7 @@ namespace Test
         [Test]
         public static void EntrapmentFastaTest()
         {
-            List<Protein> proteins = ProteinDbLoader.LoadProteinFasta(@"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes_210111.fasta", true, DecoyType.Reverse, false, out var a,
+            List<Protein> proteins = ProteinDbLoader.LoadProteinFasta(@"F:\PValuePaperRawFiles\Revision_Search_Results\Bottom_Up_Vignette\uniprot-proteome UP000005640+reviewed yes_210108.fasta", true, DecoyType.None, false, out var a,
                 ProteinDbLoader.UniprotAccessionRegex, ProteinDbLoader.UniprotFullNameRegex, ProteinDbLoader.UniprotNameRegex, ProteinDbLoader.UniprotGeneNameRegex,
                 ProteinDbLoader.UniprotOrganismRegex);
 
@@ -256,7 +256,7 @@ namespace Test
                 int myIndex = 0;
                 for (int i = 0; i < proteinAminoacids.Length; i++)
                 {
-                    if(proteinAminoacids[i] != 'K' && proteinAminoacids[i] != 'R')
+                    if (proteinAminoacids[i] != 'K' && proteinAminoacids[i] != 'R')
                     {
                         proteinAminoacids[i] = myRandomTrimmedArray[myIndex];
                         myIndex++;
@@ -268,9 +268,71 @@ namespace Test
                 entrapmentProteins.Add(new Protein(trapSequence, "TRAP_" + protein.Accession, organism: "TRAP"));
             }
 
-            ProteinDbWriter.WriteFastaDatabase(entrapmentProteins, @"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes_210111_TRAP.fasta", "|");
+            ProteinDbWriter.WriteFastaDatabase(entrapmentProteins, @"F:\PValuePaperRawFiles\Revision_Search_Results\Bottom_Up_Vignette\uniprot-proteome UP000005640+reviewed yes_210108_TRAP.fasta", "|");
         }
 
+        [Test]
+        public static void EntrapmentXMLTest()
+        {
+            var psiModDeserialized = Loaders.LoadPsiMod(@"C:\Users\Michael Shortreed\Downloads\PSI-MOD.obo.xml");
+            Dictionary<string, int> formalChargesDictionary = Loaders.GetFormalChargesDictionary(psiModDeserialized);
+            UniProtPtms = Loaders.LoadUniprot(@"C:\Users\Michael Shortreed\Downloads\ptmlist.txt", formalChargesDictionary).ToList();
+
+            Dictionary<string, Modification> unknown = new Dictionary<string, Modification>();
+
+            List<Protein> proteins = ProteinDbLoader.LoadProteinXML(@"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes.xml", true, DecoyType.None, UniProtPtms, false, null, out unknown, 1, 4, 1);
+            List<Protein> entrapmentProteins = new List<Protein>();
+
+            foreach (Protein protein in proteins)
+            {
+                char[] originalProteinAminoacids = protein.BaseSequence.ToCharArray();
+                char[] newProteinAminoacids = new char[originalProteinAminoacids.Length];
+                List<int> nonMandKandRpositionsOriginal = Enumerable.Range(0, originalProteinAminoacids.Length).ToList();
+                List<int> theMandKandRposition = new List<int>();
+                Dictionary<int, List<Modification>> newOneBasedModifications = new Dictionary<int, List<Modification>>();
+
+                if(originalProteinAminoacids[0] == 'M')
+                {
+                    theMandKandRposition.Add(0);
+                    nonMandKandRpositionsOriginal.RemoveAll(x=>x == 0);
+                    newProteinAminoacids[0] = 'M';
+                    if (protein.OneBasedPossibleLocalizedModifications.ContainsKey(1))
+                    {
+                        newOneBasedModifications.Add(1, protein.OneBasedPossibleLocalizedModifications[1]);
+                    }
+                }
+
+                for (int i = 0; i < originalProteinAminoacids.Length; i++)
+                {
+                    if (originalProteinAminoacids[i] == 'K' || originalProteinAminoacids[i] == 'R')
+                    {
+                        theMandKandRposition.Add(i);
+                        nonMandKandRpositionsOriginal.RemoveAll(x => x == i);
+                        newProteinAminoacids[i] = originalProteinAminoacids[i];
+                        if (protein.OneBasedPossibleLocalizedModifications.ContainsKey(i + 1))
+                        {
+                            newOneBasedModifications.Add(i + 1, protein.OneBasedPossibleLocalizedModifications[i+1]);
+                        }
+                    }
+                }
+                Random rnd = new Random();
+                List<int> scram = nonMandKandRpositionsOriginal.OrderBy(x => rnd.Next()).ToList();
+
+                for (int i = 0; i < nonMandKandRpositionsOriginal.Count(); i++)
+                {
+                    newProteinAminoacids[scram[i]] = originalProteinAminoacids[nonMandKandRpositionsOriginal[i]];
+                    if (protein.OneBasedPossibleLocalizedModifications.ContainsKey(nonMandKandRpositionsOriginal[i]+1))
+                    {
+                        newOneBasedModifications.Add(scram[i]+1, protein.OneBasedPossibleLocalizedModifications[nonMandKandRpositionsOriginal[i]+1]);
+                    }
+                }
+
+                string trapSequence = new string(newProteinAminoacids);
+
+                entrapmentProteins.Add(new Protein(trapSequence, "TRAP_" + protein.Accession, organism: "TRAP", oneBasedModifications: newOneBasedModifications));
+            }
+            ProteinDbWriter.WriteXmlDatabase(null, entrapmentProteins, @"F:\PValuePaperRawFiles\Revision_Search_Results\TopDownVignette\uniprot-proteome UP000000589+reviewed yes_TRAP.xml");
+        }
 
         [Test]
         public static void BadFastaTest()
