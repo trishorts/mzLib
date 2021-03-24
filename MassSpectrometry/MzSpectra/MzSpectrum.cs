@@ -21,7 +21,6 @@ using MathNet.Numerics.Statistics;
 using MzLibUtil;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -324,7 +323,7 @@ namespace MassSpectrometry
                         }
 
                         //create a list for each isotopic peak from this envelope. This is used to fine tune the monoisotopic mass and is populated in "FindIsotopicEnvelope"
-                        List<double> monoisotopicMassPredictions = new List<double>(); 
+                        List<double> monoisotopicMassPredictions = new List<double>();
 
                         //Look for other isotopes using the assumed charge state
                         IsotopicEnvelope putativeIsotopicEnvelope = FindIsotopicEnvelope(massIndex, candidateForMostIntensePeakMz, candidateForMostIntensePeakIntensity,

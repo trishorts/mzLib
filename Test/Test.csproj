@@ -256,6 +256,9 @@
     <None Update="DataFiles\BinGenerationTest.mzML">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="DataFiles\PEPTIDE_MS1_mz_and_intensities.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="DataFiles\small.RAW">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
