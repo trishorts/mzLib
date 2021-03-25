@@ -52,6 +52,8 @@ namespace Chemistry
         private static readonly Regex ValidateFormulaRegex = new Regex("^(" + FormulaRegex + ")+$", RegexOptions.Compiled);
 
         private string formulaString;
+        public Dictionary<Element, int> Elements { get; private set; }
+
 
         public ChemicalFormula()
         {
@@ -161,7 +163,7 @@ namespace Chemistry
         }
 
         internal Dictionary<Isotope, int> Isotopes { get; private set; }
-        internal Dictionary<Element, int> Elements { get; private set; }
+        //internal Dictionary<Element, int> Elements { get; private set; }
 
         public static ChemicalFormula Combine(IEnumerable<IHasChemicalFormula> formulas)
         {
