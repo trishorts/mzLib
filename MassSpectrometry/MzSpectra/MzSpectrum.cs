@@ -84,6 +84,46 @@ namespace MassSpectrometry
             }
         }
 
+        public MzSpectrum(Dictionary<string,double> OneAA_Averageine)
+        {
+            // AVERAGINE
+            double averageC = OneAA_Averageine["C"];
+            double averageH = OneAA_Averageine["H"];
+            double averageO = OneAA_Averageine["O"];
+            double averageN = OneAA_Averageine["N"];
+            double averageS = OneAA_Averageine["S"];
+
+            const double fineRes = 0.125;
+            const double minRes = 1e-8;
+
+            for (int i = 0; i < numAveraginesToGenerate; i++)
+            {
+                double averagineMultiplier = (i + 1) / 2.0;
+                //Console.Write("numAveragines = " + numAveragines);
+                ChemicalFormula chemicalFormula = new ChemicalFormula();
+                chemicalFormula.Add("C", Convert.ToInt32(averageC * averagineMultiplier));
+                chemicalFormula.Add("H", Convert.ToInt32(averageH * averagineMultiplier));
+                chemicalFormula.Add("O", Convert.ToInt32(averageO * averagineMultiplier));
+                chemicalFormula.Add("N", Convert.ToInt32(averageN * averagineMultiplier));
+                chemicalFormula.Add("S", Convert.ToInt32(averageS * averagineMultiplier));
+
+                {
+                    var chemicalFormulaReg = chemicalFormula;
+                    IsotopicDistribution ye = IsotopicDistribution.GetDistribution(chemicalFormulaReg, fineRes, minRes);
+                    var masses = ye.Masses.ToArray();
+                    var intensities = ye.Intensities.ToArray();
+                    Array.Sort(intensities, masses);
+                    Array.Reverse(intensities);
+                    Array.Reverse(masses);
+
+                    mostIntenseMasses[i] = masses[0];
+                    diffToMonoisotopic[i] = masses[0] - chemicalFormulaReg.MonoisotopicMass;
+                    allMasses[i] = masses;
+                    allIntensities[i] = intensities;
+                }
+            }
+        }
+
         public MzSpectrum(double[,] mzintensities)
         {
             var count = mzintensities.GetLength(1);

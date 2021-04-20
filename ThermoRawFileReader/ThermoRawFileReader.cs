@@ -57,7 +57,7 @@ namespace IO.ThermoRawFileReader
                 throw new MzLibException("RAW file still being acquired!");
             }
 
-            rawFileAccessor.SelectInstrument(Device.MS, 1);
+            rawFileAccessor.SelectInstrument(0, 1);
             var msDataScans = new MsDataScan[rawFileAccessor.RunHeaderEx.LastSpectrum];
 
             Parallel.ForEach(Partitioner.Create(0, msDataScans.Length), new ParallelOptions { MaxDegreeOfParallelism = maxThreads }, (fff, loopState) =>

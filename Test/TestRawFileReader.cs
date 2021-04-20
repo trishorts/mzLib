@@ -36,6 +36,12 @@ namespace Test
         }
 
         [Test]
+        public static void DebugTest()
+        {
+            var a = ThermoRawFileReader.LoadAllStaticData(@"E:\Projects\junk1\210412_Fusion2_017_CAD_WC.raw", maxThreads: 1);
+        }
+
+        [Test]
         /// <summary>
         /// Tests the dynamic connection for ThermoRawFileReader
         /// </summary>
@@ -68,6 +74,20 @@ namespace Test
             dynamicConnection2.CloseDynamicConnection();
 
             Console.WriteLine($"Analysis time for TestDynamicConnectionRawFileReader: {stopwatch.Elapsed.Hours}h {stopwatch.Elapsed.Minutes}m {stopwatch.Elapsed.Seconds}s");
+        }
+
+        [Test]
+        public static void MyFakeTest()
+        {
+            var filterParams = new FilteringParams(200, 0.01, 0, 1, false, true, true);
+
+            var path = @"F:\JurkatTD_SeanDaiPaper\FXN4_tr2_032017.raw";
+
+            var a = ThermoRawFileReader.LoadAllStaticData(path, filterParams, maxThreads: 1);
+
+            var rawScans = a.GetAllScansList();
+
+
         }
 
         [Test]

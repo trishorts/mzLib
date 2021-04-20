@@ -28,6 +28,12 @@ namespace Test
         }
 
         [Test]
+        public static void MyStupidTest()
+        {
+            var jj = Mgf.LoadAllStaticData(@"C:\Users\Michael Shortreed\Downloads\mgfwchen.mgf");
+        }
+
+        [Test]
         public static void TestLoadMgf()
         {
             try
