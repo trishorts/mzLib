@@ -63,7 +63,7 @@ namespace FlashLFQ
             double ppmTolerance = 10.0,
             double isotopeTolerancePpm = 5.0,
             bool integrate = false,
-            int numIsotopesRequired = 2,
+            int numIsotopesRequired = 1,
             bool idSpecificChargeState = false,
             bool silent = false,
             int maxThreads = -1,
