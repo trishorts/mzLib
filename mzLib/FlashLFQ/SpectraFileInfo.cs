@@ -1,4 +1,6 @@
-﻿namespace FlashLFQ
+﻿using MzLibUtil;
+
+namespace FlashLFQ
 {
     public class SpectraFileInfo
     {
@@ -12,7 +14,7 @@
         public SpectraFileInfo(string fullFilePathWithExtension, string condition, int biorep, int techrep, int fraction)
         {
             this.FullFilePathWithExtension = fullFilePathWithExtension;
-            this.FilenameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(this.FullFilePathWithExtension);
+            this.FilenameWithoutExtension = PeriodTolerantFilenameWithoutExtension.GetPeriodTolerantFilenameWithoutExtension(this.FullFilePathWithExtension);
             this.Condition = condition;
             this.BiologicalReplicate = biorep;
             this.TechnicalReplicate = techrep;
