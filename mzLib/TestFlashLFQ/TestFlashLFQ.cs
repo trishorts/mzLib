@@ -843,6 +843,84 @@ namespace Test
         }
 
         [Test]
+        public static void TestFlashIgnoreUNDEFINEDinProteinQuant()
+        {
+            ProteinGroup undefinedPg = new ProteinGroup("UNDEFINED", "", "");
+            ProteinGroup pg = new ProteinGroup("Q9UMS4", "PRPF19", "Homo sapiens");
+
+
+            FlashLFQ.Peptide ahe = new ("AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", "AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", true, new HashSet<ProteinGroup> { pg });
+            FlashLFQ.Peptide alq = new ("ALQDEWDAVMLHSFTLR", "ALQDEWDAVMLHSFTLR", true, new HashSet<ProteinGroup> { pg });
+            FlashLFQ.Peptide iws = new ("IWSVPNASCVQVVR", "IWSVPNASCVQVVR", true, new HashSet<ProteinGroup> { pg, undefinedPg });
+            FlashLFQ.Peptide nvv = new ("NVVVFDK", "NVVVFDK", true, new HashSet<ProteinGroup> { pg, undefinedPg });
+            FlashLFQ.Peptide sse = new ("SSEQILATLK", "SSEQILATLK", true, new HashSet<ProteinGroup> { pg });
+
+            SpectraFileInfo a1 = new ("a1", "a", 0, 0, 0);
+            SpectraFileInfo b1 = new ("b1", "a", 0, 0, 0);
+            var files = new List<SpectraFileInfo>{ a1, b1 };
+
+            ahe.SetIntensity(files[0], 9796546);
+            ahe.SetIntensity(files[1], 9852023.625);
+
+            alq.SetIntensity(files[0], 22670965.1462027);
+            alq.SetIntensity(files[1], 0);
+
+            iws.SetIntensity(files[0], 36855296.25);
+            iws.SetIntensity(files[1], 37850456.5);
+
+            nvv.SetIntensity(files[0], 0);
+            nvv.SetIntensity(files[1], 23803510.25);
+
+            sse.SetIntensity(files[0], 27894671.25);
+            sse.SetIntensity(files[1], 27384454.5);
+
+
+            ahe.SetDetectionType(files[0], DetectionType.MSMS);
+            ahe.SetDetectionType(files[1], DetectionType.MSMS);
+
+            alq.SetDetectionType(files[0], DetectionType.MSMS);
+            alq.SetDetectionType(files[1], DetectionType.NotDetected);
+
+            iws.SetDetectionType(files[0], DetectionType.MSMS);
+            iws.SetDetectionType(files[1], DetectionType.MSMS);
+
+            nvv.SetDetectionType(files[0], DetectionType.NotDetected);
+            nvv.SetDetectionType(files[1], DetectionType.MSMS);
+
+            sse.SetDetectionType(files[0], DetectionType.MSMS);
+            sse.SetDetectionType(files[1], DetectionType.MSMS);
+
+            List<Identification> ids = new List<Identification>
+            {
+                new Identification(a1, "AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", "AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", 0, 0, 0, ahe.ProteinGroups.ToList()),
+                new Identification(b1, "AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", "AHESAVTGLSLHATGDYLLSSSDDQYWAFSDIQTGR", 0, 0, 0, ahe.ProteinGroups.ToList()),
+
+                new Identification(a1, "ALQDEWDAVMLHSFTLR", "ALQDEWDAVMLHSFTLR", 0, 0, 0, alq.ProteinGroups.ToList()),
+                new Identification(b1, "ALQDEWDAVMLHSFTLR", "ALQDEWDAVMLHSFTLR", 0, 0, 0, alq.ProteinGroups.ToList()),
+
+                new Identification(a1, "IWSVPNASCVQVVR", "IWSVPNASCVQVVR", 0, 0, 0, iws.ProteinGroups.ToList()),
+                new Identification(b1, "IWSVPNASCVQVVR", "IWSVPNASCVQVVR", 0, 0, 0, iws.ProteinGroups.ToList()),
+
+                new Identification(a1, "NVVVFDK", "NVVVFDK", 0, 0, 0, nvv.ProteinGroups.ToList()),
+                new Identification(b1, "NVVVFDK", "NVVVFDK", 0, 0, 0, nvv.ProteinGroups.ToList()),
+
+                new Identification(a1, "SSEQILATLK", "SSEQILATLK", 0, 0, 0, sse.ProteinGroups.ToList()),
+                new Identification(b1, "SSEQILATLK", "SSEQILATLK", 0, 0, 0, sse.ProteinGroups.ToList())
+            };
+
+            FlashLfqResults r = new FlashLfqResults(files, ids);
+
+            r.CalculateProteinResultsMedianPolish(false, false);
+
+
+
+            List<FlashLFQ.Peptide> bubba = r.RemovePeptidesWithUndefinedProteinGroups();
+
+            r.CalculatePeptideResults();
+            r.CalculateProteinResultsMedianPolish(false);
+        }
+
+        [Test]
         public static void TestBayesianProteinQuantification()
         {
             // this mostly just tests that the Bayesian quant algorithm produces "reasonable"
@@ -1001,6 +1079,22 @@ namespace Test
 
             Assert.AreEqual(3, proteins.Count);
             CollectionAssert.AreEquivalent(new string[] { "P52298", "Q15149", "Q7KZF4" }, proteins.Select(p => p.ProteinGroupName.ToArray()));
+
+            //now let's look at the process where we ignore peptides that have a protein group that is UNDEFINED
+            ProteinGroup undefinedPg = new ProteinGroup("UNDEFINED", "", "");
+
+            ids[0].ProteinGroups.Add(undefinedPg);
+            engine = new FlashLfqEngine(ids, matchBetweenRuns: true, requireMsmsIdInCondition: false, useSharedPeptidesForProteinQuant: true, maxThreads: -1);
+            results = engine.Run();
+
+            peaks = results.Peaks.Values.ToList();
+            peptides = results.PeptideModifiedSequences.Values.ToList();
+            proteins = results.ProteinGroups.Values.ToList();
+
+            peptides = results.RemovePeptidesWithUndefinedProteinGroups();
+            bool removePeptidesWithUndefinedProteinGroups = true;
+            results.CalculateProteinResultsMedianPolish(false, removePeptidesWithUndefinedProteinGroups);
+
 
             Directory.Delete(outputDirectory, true);
         }

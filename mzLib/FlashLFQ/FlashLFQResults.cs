@@ -300,11 +300,23 @@ namespace FlashLFQ
             }
         }
 
+        public List<Peptide> RemovePeptidesWithUndefinedProteinGroups()
+        {
+            List<Peptide> peptides = new();
+            foreach (Peptide peptide in PeptideModifiedSequences.Values)
+            {
+                if (!peptide.ProteinGroups.Select(p => p.ProteinGroupName).ToList().Contains("UNDEFINED"))
+                {
+                    peptides.Add(peptide);
+                }
+            }
+            return peptides;
+        }
         /// <summary>
         /// This method uses the median polish algorithm to calculate protein quantities in each biological replicate.
         /// See https://mgimond.github.io/ES218/Week11a.html for an example of the median polish algorithm.
         /// </summary>
-        public void CalculateProteinResultsMedianPolish(bool useSharedPeptides)
+        public void CalculateProteinResultsMedianPolish(bool useSharedPeptides, bool removeUndefinedPeptides = false)
         {
             // reset protein intensities to 0
             foreach (var proteinGroup in ProteinGroups)
@@ -316,27 +328,37 @@ namespace FlashLFQ
             }
 
             // associate peptide w/ proteins in a dictionary for easy lookup
-            List<Peptide> peptides = PeptideModifiedSequences.Values.Where(p => p.UnambiguousPeptideQuant()).ToList();
+            List<Peptide> peptides = new List<Peptide>();
+            if (!removeUndefinedPeptides)
+            {
+                peptides = PeptideModifiedSequences.Values.Where(p => p.UnambiguousPeptideQuant()).ToList();
+            }
+            else
+            {
+                peptides = RemovePeptidesWithUndefinedProteinGroups();
+            }
+            
             Dictionary<ProteinGroup, List<Peptide>> proteinGroupToPeptides = new Dictionary<ProteinGroup, List<Peptide>>();
 
             foreach (Peptide peptide in peptides)
             {
-                if (!peptide.UseForProteinQuant || (peptide.ProteinGroups.Count > 1 && !useSharedPeptides))
-                {
-                    continue;
-                }
 
-                foreach (ProteinGroup pg in peptide.ProteinGroups)
-                {
-                    if (proteinGroupToPeptides.TryGetValue(pg, out var peptidesForThisProtein))
+                    if (!peptide.UseForProteinQuant || (peptide.ProteinGroups.Count > 1 && !useSharedPeptides))
                     {
-                        peptidesForThisProtein.Add(peptide);
+                        continue;
                     }
-                    else
+
+                    foreach (ProteinGroup pg in peptide.ProteinGroups)
                     {
-                        proteinGroupToPeptides.Add(pg, new List<Peptide> { peptide });
+                        if (proteinGroupToPeptides.TryGetValue(pg, out var peptidesForThisProtein))
+                        {
+                            peptidesForThisProtein.Add(peptide);
+                        }
+                        else
+                        {
+                            proteinGroupToPeptides.Add(pg, new List<Peptide> { peptide });
+                        }
                     }
-                }
             }
 
             var filesGroupedByCondition = SpectraFiles.GroupBy(p => p.Condition).ToList();
@@ -346,7 +368,7 @@ namespace FlashLFQ
             {
                 if (proteinGroupToPeptides.TryGetValue(proteinGroup, out var peptidesForThisProtein))
                 {
-                    // set up peptide intensity table
+                    // set up ppeptide intensity table
                     int numSamples = 0;
                     foreach (var condition in SpectraFiles.GroupBy(p => p.Condition))
                     {
@@ -428,6 +450,7 @@ namespace FlashLFQ
                             // than an intensity, but unlike a fold-change it's not relative to a particular sample.
                             // by multiplying this value by the reference protein intensity calculated earlier, then we get 
                             // a protein intensity value
+
                             double sampleProteinIntensity = Math.Pow(2, columnEffects[sampleN]) * referenceProteinIntensity;
 
                             // the column effect can be 0 in many cases. sometimes it's a valid value and sometimes it's not.
