@@ -809,11 +809,11 @@ namespace Test
             Assert.AreEqual("MKEITPMEP", p_cnbr_reverse.BaseSequence);
             Assert.AreEqual(p_cnbr.FullSequence, p_cnbr_reverse.PeptideDescription);
 
-            //  elastase cleave after A, V, S, G, L, I,
+            //  elastase cleave after IPSPLPVPNPTPKPAPGPYPQPRPFD
             newAminoAcidPositions = new int["KAYVPSRGHLDIN".Length];
-            PeptideWithSetModifications p_elastase = new PeptideWithSetModifications(new Protein("KAYVPSRGHLDIN", "DECOY_ELASTASE"), new DigestionParams(protease: "elastase"), 1, 13, CleavageSpecificity.Full, null, 0, new Dictionary<int, Modification>(), 0, null);
+            PeptideWithSetModifications p_elastase = new PeptideWithSetModifications(new Protein("KAYVPSRGHLDIN", "DECOY_ELASTASE"), new DigestionParams(protease: "elastase(don't cleave before proline 15mc)"), 1, 13, CleavageSpecificity.Full, null, 0, new Dictionary<int, Modification>(), 0, null);
             PeptideWithSetModifications p_elastase_reverse = p_elastase.GetReverseDecoyFromTarget(newAminoAcidPositions);
-            Assert.AreEqual("NADVHSRGPLYIK", p_elastase_reverse.BaseSequence);
+            Assert.AreEqual("KAYHPSRGVLDIN", p_elastase_reverse.BaseSequence);
 
             //  top-down
             newAminoAcidPositions = new int["RPEPTIREK".Length];
