@@ -10,6 +10,7 @@ using System.Linq;
 using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace MassSpectrometry.MzSpectra
 {
@@ -184,6 +185,18 @@ namespace MassSpectrometry.MzSpectra
 
         public bool DoubleWithinToleranceBool(double[] array, double value, PpmTolerance ppmTolerance)
         {
+            int myIndex = Array.BinarySearch(array, value,);
+            if (myIndex < 0)
+            {
+                Console.WriteLine("The object to search for ({0}) is not found. The next larger object is at index {1}.", myObject, ~myIndex);
+            }
+            else
+            {
+                Console.WriteLine("The object to search for ({0}) is at index {1}.", myObject, myIndex);
+            }
+
+
+
             if (array.Length == 1 && !ppmTolerance.Within(array[0], value))
             {
                 return false;
@@ -214,6 +227,11 @@ namespace MassSpectrometry.MzSpectra
                     }
                 }
             }
+        }
+        public int CompareTo(double peak, double otherPeak, Tolerance tol)
+        {
+            if (tol.Within(peak, otherPeak)) return 0; // peaks are equal within tolerance
+            return peak.CompareTo(otherPeak);
         }
 
         public double? DoubleWithinToleranceValue(double[] array, double value, PpmTolerance ppmTolerance)
