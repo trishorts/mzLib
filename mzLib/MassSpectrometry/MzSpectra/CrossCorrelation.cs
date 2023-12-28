@@ -182,55 +182,69 @@ namespace MassSpectrometry.MzSpectra
             return intensityPairs;
         }
 
-        public bool DoubleWithinToleranceBool(double[] array, double value, double tolerance)
+        public bool DoubleWithinToleranceBool(double[] array, double value, PpmTolerance ppmTolerance)
         {
-            if (array.Length == 1 && !Within(array[0], value, tolerance))
+            if (array.Length == 1 && !ppmTolerance.Within(array[0], value))
             {
                 return false;
             }
             else
             {
                 int mid = array.Length / 2;
-                if (Within(array[mid], value, tolerance))
+                if (ppmTolerance.Within(array[mid], value))
                 {
                     return true;
                 }
                 else
                 {
-                    if (value > array[mid] && value <= array.Last())
+                    if (value > array[mid])
                     {
-                        return DoubleWithinToleranceBool(array.TakeLast(array.Length - mid).ToArray(), value, tolerance);
+                        if((array.Length -mid) >= 1)
+                        {
+                            return DoubleWithinToleranceBool(array.TakeLast(array.Length - mid).ToArray(), value, ppmTolerance);
+                        }
+                        else
+                        {
+                            return false;
+                        }
                     }
                     else
                     {
-                        return DoubleWithinToleranceBool(array.Take(mid).ToArray(), value, tolerance);
+                        return DoubleWithinToleranceBool(array.Take(mid).ToArray(), value, ppmTolerance);
                     }
                 }
             }
         }
 
-        public double? DoubleWithinToleranceValue(double[] array, double value, double tolerance)
+        public double? DoubleWithinToleranceValue(double[] array, double value, PpmTolerance ppmTolerance)
         {
-            if (array.Length == 1 && !Within(array[0], value, tolerance))
+            if (array.Length == 1 && !ppmTolerance.Within(array[0], value))
             {
                 return null;
             }
             else
             {
                 int mid = array.Length / 2;
-                if (Within(array[mid], value, tolerance))
+                if (ppmTolerance.Within(array[mid], value))
                 {
                     return array[mid];
                 }
                 else
                 {
-                    if (value > array[mid] && value <= array.Last())
+                    if (value > array[mid])
                     {
-                        return DoubleWithinToleranceValue(array.TakeLast(array.Length - mid).ToArray(), value, tolerance);
+                        if ((array.Length - mid) >= 1)
+                        {
+                            return DoubleWithinToleranceValue(array.TakeLast(array.Length - mid).ToArray(), value, ppmTolerance);
+                        }
+                        else
+                        {
+                            return null;
+                        }
                     }
                     else
                     {
-                        return DoubleWithinToleranceValue(array.Take(mid).ToArray(), value, tolerance);
+                        return DoubleWithinToleranceValue(array.Take(mid).ToArray(), value, ppmTolerance);
                     }
                 }
             }
@@ -291,7 +305,7 @@ namespace MassSpectrometry.MzSpectra
 
         private bool Within(double mz1, double mz2, double localPpmTolerance)
         {
-            return ((Math.Abs(mz1 - mz2) / Math.Max(mz1, mz2) * 1000000.0) < localPpmTolerance);
+            return ((Math.Abs(mz1 - mz2) / Math.Max(mz1, mz2) * 1000000.0) <= localPpmTolerance);
         }
         public enum SpectrumNormalizationScheme
         {
