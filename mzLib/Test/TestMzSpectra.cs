@@ -14,7 +14,7 @@ namespace Test
     public sealed class TestMzSpectra
     {
         [Test]
-        public void SpectrCroumCount()
+        public void BinarySearchArray()
         {
             CrossCorrelation c = new CrossCorrelation(new double[1], new double[1], new double[1], new double[1],
                 CrossCorrelation.SpectrumNormalizationScheme.unnormalized, 5.0, true);
