@@ -100,9 +100,9 @@ namespace Test.FileReadingTests
         [Test]
         public static void SnipMzMl()
         {
-            string origDataFile = @"E:\Projects\GlycoNickLei_PXD017646\2019_07_30_GlycoPepMix_35trig_EThcD35_rep2.raw";
-            int startScan = 5715;
-            int endScan = 5915;
+            string origDataFile = @"E:\Projects\ChymoTest\130328_Chym_Frac3_130409222556.raw";
+            int startScan = 25552;
+            int endScan = 25562;
             FilteringParams filter = new FilteringParams(200, 0.01, 1, null, false, false, true);
             var reader = MsDataFileReader.GetDataFile(origDataFile);
             reader.LoadAllStaticData(filter, 1);
