@@ -32,7 +32,12 @@ namespace Test.FileReadingTests
         [TestCase(@"FileReadingTests\ExternalFileTypes\FraggerProtein_FragPipev21.1individual_protein.tsv", SupportedFileType.MsFraggerProtein)]
         [TestCase(@"FileReadingTests\ExternalFileTypes\FraggerPeptide_FragPipev21.1combined_peptide.tsv", SupportedFileType.MsFraggerPeptide)]
         [TestCase(@"FileReadingTests\ExternalFileTypes\FraggerProtein_FragPipev21.1combined_protein.tsv", SupportedFileType.MsFraggerProtein)]
-        
+        [TestCase(@"FileReadingTests\ExternalFileTypes\FlashLFQ_MzLib1.0.549_QuantifiedPeaks.tsv", SupportedFileType.FlashLFQQuantifiedPeak)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\MsPathFinderT_TargetResults_IcTarget.tsv", SupportedFileType.MsPathFinderTTargets)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\MsPathFinderT_DecoyResults_IcDecoy.tsv", SupportedFileType.MsPathFinderTDecoys)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\MsPathFinderT_AllResults_IcTda.tsv", SupportedFileType.MsPathFinderTAllResults)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\crux.txt", SupportedFileType.CruxResult)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\EditedMSFraggerResults\experiment_annotation.tsv", SupportedFileType.ExperimentAnnotation)]
         public static void TestSupportedFileTypeExtensions(string filePath, SupportedFileType expectedType)
         {
             var supportedType = filePath.ParseFileType();
@@ -52,6 +57,7 @@ namespace Test.FileReadingTests
         [Test]
         public static void TestSupportedFileTypeExtension_Errors()
         {
+
             string badTest = "badFile.taco";
             Exception e = Assert.Throws<MzLibException>(() => badTest.ParseFileType());
             Assert.That(e?.Message, Is.EqualTo($"File type not supported"));
@@ -88,7 +94,5 @@ namespace Test.FileReadingTests
             Assert.That(e?.Message,
                 Is.EqualTo($"File type not supported"));
         }
-        
-
     }
 }

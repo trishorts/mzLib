@@ -9,18 +9,14 @@ namespace FlashLFQ
     public class RtInfo
     {
         public double PredictedRt { get; }
-        public double Width { get; }
-        public double? RtSd { get; }
-        public double? RtInterquartileRange { get; }
+        public double Width { get; set; }
         public double RtStartHypothesis => PredictedRt - (Width / 2.0);
         public double RtEndHypothesis => PredictedRt + (Width / 2.0);
 
-        public RtInfo(double predictedRt, double width, double? rtSd, double? rtInterquartileRange)
+        public RtInfo(double predictedRt, double width)
         {
             PredictedRt = predictedRt;
             Width = width;
-            RtSd = rtSd;
-            RtInterquartileRange = rtInterquartileRange;
         }
     }
 }
