@@ -197,5 +197,41 @@ namespace Omics
 
             return subSequence.ToString();
         }
+        /// <summary>
+        /// Determines the ProForma-compliant sequence of a BioPolymerWithSetMods from its base sequence and modifications.
+        /// Uses IdWithMotif in square brackets after the modified residue.
+        /// </summary>
+        public static string DetermineProFormaCompliantSequence(string baseSequence, IDictionary<int, Modification> allModsOneIsNterminus)
+        {
+            var sb = new StringBuilder(baseSequence.Length + allModsOneIsNterminus.Count * 20);
+
+            // N-terminal modification: show in brackets before the first residue, no caret
+            if (allModsOneIsNterminus.TryGetValue(1, out Modification nTermMod))
+            {
+                string nTermId = !string.IsNullOrEmpty(nTermMod.IdWithMotif) ? nTermMod.IdWithMotif : nTermMod.OriginalId;
+                sb.Append($"[{nTermId}]");
+            }
+
+            for (int i = 0; i < baseSequence.Length; i++)
+            {
+                sb.Append(baseSequence[i]);
+                // Modifications are 1-based: 1=N-term, 2=first residue, 3=second residue, etc.
+                if (allModsOneIsNterminus.TryGetValue(i + 2, out Modification mod))
+                {
+                    string modId = !string.IsNullOrEmpty(mod.IdWithMotif) ? mod.IdWithMotif : mod.OriginalId;
+                    sb.Append($"[{modId}]");
+                }
+            }
+
+            // C-terminal modification: show in brackets after the last residue, with dollar sign
+            if (allModsOneIsNterminus.TryGetValue(baseSequence.Length + 2, out Modification cTermMod))
+            {
+                string cTermId = !string.IsNullOrEmpty(cTermMod.IdWithMotif) ? cTermMod.IdWithMotif : cTermMod.OriginalId;
+                sb.Append($"[${cTermId}]");
+            }
+        
+
+            return sb.ToString();
+        }
     }
 }
