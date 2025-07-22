@@ -18,6 +18,12 @@ namespace MassSpectrometry.Deconvolution.Algorithms
 
         [DllImport("OpenMS.dll", EntryPoint = "process_spectrum", CallingConvention = CallingConvention.Cdecl)]
         protected static extern int process_spectrum(double[] cmz, float[] cintensity, int c, string fname, IntPtr matchedpeaks, FlashDeconvDeconvolutionParamters.FlashDeconvSettings settings);
+        public static extern int FlashDeconv(string inputMzML, string outputMzML);
+
+        public void Bubba(string inputMzML, string outputMzML)
+        {
+            int result = FlashDeconvOpenMsAlgorithm.FlashDeconv("input.mzML", "output.mzML");
+        }
 
         internal override IEnumerable<IsotopicEnvelope> Deconvolute(MzSpectrum spectrum, MzRange range)
         {
