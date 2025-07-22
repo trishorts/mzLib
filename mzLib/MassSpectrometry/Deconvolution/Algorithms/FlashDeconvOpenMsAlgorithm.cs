@@ -1,4 +1,5 @@
-﻿using MzLibUtil;
+﻿using MassSpectrometry.Deconvolution.Parameters;
+using MzLibUtil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,11 +17,11 @@ namespace MassSpectrometry.Deconvolution.Algorithms
         }
 
         [DllImport("OpenMS.dll", EntryPoint = "process_spectrum", CallingConvention = CallingConvention.Cdecl)]
-        protected static extern int process_spectrum(double[] cmz, float[] cintensity, int c, string fname, IntPtr matchedpeaks, IsoDecDeconvolutionParameters.IsoSettings settings);
+        protected static extern int process_spectrum(double[] cmz, float[] cintensity, int c, string fname, IntPtr matchedpeaks, FlashDeconvDeconvolutionParamters.FlashDeconvSettings settings);
 
         internal override IEnumerable<IsotopicEnvelope> Deconvolute(MzSpectrum spectrum, MzRange range)
         {
-            var deconParams = DeconvolutionParameters as IsoDecDeconvolutionParameters ?? throw new MzLibException("Deconvolution params and algorithm do not match");
+            var deconParams = DeconvolutionParameters as FlashDeconvDeconvolutionParamters ?? throw new MzLibException("Deconvolution params and algorithm do not match");
 
             var firstIndex = spectrum.GetClosestPeakIndex(range.Minimum);
             var lastIndex = spectrum.GetClosestPeakIndex(range.Maximum);
@@ -37,7 +38,7 @@ namespace MassSpectrometry.Deconvolution.Algorithms
             try
             {
                 IntPtr matchedPeaksPtr = (IntPtr)handle.AddrOfPinnedObject();
-                IsoDecDeconvolutionParameters.IsoSettings settings = deconParams.ToIsoSettings();
+                FlashDeconvDeconvolutionParamters.FlashDeconvSettings settings = deconParams.ToFlashSettings();
                 int result = process_spectrum(mzs, intensities, intensities.Length, null, matchedPeaksPtr, settings);
                 if (result <= 0)
                     return Enumerable.Empty<IsotopicEnvelope>();
@@ -63,7 +64,7 @@ namespace MassSpectrometry.Deconvolution.Algorithms
         /// <param name="matchedpeaks"></param>
         /// <param name="spectrum"></param>
         /// <returns></returns>
-        private List<IsotopicEnvelope> ConvertToIsotopicEnvelopes(IsoDecDeconvolutionParameters parameters, MatchedPeak[] matchedpeaks, MzSpectrum spectrum)
+        private List<IsotopicEnvelope> ConvertToIsotopicEnvelopes(FlashDeconvDeconvolutionParamters parameters, MatchedPeak[] matchedpeaks, MzSpectrum spectrum)
         {
             List<IsotopicEnvelope> result = new List<IsotopicEnvelope>();
             int currentId = 0;
@@ -93,14 +94,8 @@ namespace MassSpectrometry.Deconvolution.Algorithms
                 }
                 int charge = peak.z;
                 if (parameters.Polarity == Polarity.Negative) { charge = -peak.z; }
-                if (parameters.ReportMulitpleMonoisos)
-                {
-                    foreach (float monoiso in peak.monoisos)
-                    {
-                        if (monoiso > 0) { result.Add(new IsotopicEnvelope(currentId, peaks, (double)monoiso, charge, peak.peakint, peak.score)); }
-                    }
-                }
-                else { result.Add(new IsotopicEnvelope(currentId, peaks, (double)peak.monoiso, charge, peak.peakint, peak.score)); }
+
+                result.Add(new IsotopicEnvelope(currentId, peaks, (double)peak.monoiso, charge, peak.peakint, peak.score));
                 currentId++;
             }
             return result;
