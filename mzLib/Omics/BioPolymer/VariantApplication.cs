@@ -30,11 +30,11 @@ namespace Omics.BioPolymer
             // If all variants are positionally valid and any is missing VCF/genotype data, fall back to bounded combinatorial application
             if (protein.SequenceVariations.All(v => v.AreValid()) && protein.SequenceVariations.Any(v => v.VariantCallFormatDataString == null || v.VariantCallFormatDataString.Genotypes.Count == 0))
             {
-                return ApplyAllVariantCombinations(protein, protein.SequenceVariations, consensusPlusVariantIsoforms).ToList();
+                return ApplyAllVariantCombinations(protein, protein.SequenceVariations, consensusPlusVariantIsoforms, minAlleleDepth, maxVariantsPerIsoform).ToList();
             }
 
             // Otherwise, do genotype/allele-depth-aware application with combinatorics limited for heterozygous sites
-            return ApplyVariants(protein, protein.SequenceVariations, maxAllowedVariantsForCombinitorics: consensusPlusVariantIsoforms, minAlleleDepth);
+            return ApplyVariants(protein, protein.SequenceVariations, maxAllowedVariantsForCombinitorics: consensusPlusVariantIsoforms, minAlleleDepth, maxVariantsPerIsoform);
         }
 
         /// <summary>
@@ -123,7 +123,11 @@ namespace Omics.BioPolymer
         /// </param>
         /// <param name="minAlleleDepth">Minimum AD (Allele Depth) per sample for an allele to be considered in application.</param>
         /// <returns>A list of concrete variant biopolymers across all individuals encoded in the VCF payloads.</returns>
-        public static List<TBioPolymerType> ApplyVariants<TBioPolymerType>(TBioPolymerType protein, IEnumerable<SequenceVariation> sequenceVariations, int maxAllowedVariantsForCombinitorics, int minAlleleDepth)
+        public static List<TBioPolymerType> ApplyVariants<TBioPolymerType>(TBioPolymerType protein, 
+            IEnumerable<SequenceVariation> sequenceVariations, 
+            int maxAllowedVariantsForCombinitorics, 
+            int minAlleleDepth,
+            int maxVariantsPerIsoform = 0)
             where TBioPolymerType : IHasSequenceVariants
         {
             // Remove duplicate effects (by SimpleString), require variants with genotype data, apply from higher to lower positions
@@ -519,7 +523,9 @@ namespace Omics.BioPolymer
         public static IEnumerable<TBioPolymerType> ApplyAllVariantCombinations<TBioPolymerType>(
             TBioPolymerType baseBioPolymer,
             List<SequenceVariation> variations,
-            int maxCombinations)
+            int maxCombinations,
+            int minAlleleDepth = 0,
+            int maxVariantsPerIsoform = 0)
             where TBioPolymerType : IHasSequenceVariants
         {
             int count = 0; // number of variants yielded so far
