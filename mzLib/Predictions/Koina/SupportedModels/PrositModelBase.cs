@@ -21,6 +21,17 @@ namespace Predictions.Koina.SupportedModels
         };
 
         /// <summary>
+        /// Mapping from mzLib modification format to monoisotopic mass values.
+        /// Used for creating Peptide objects with mass-based modification notation.
+        /// Override in derived classes to add model-specific modifications.
+        /// </summary>
+        public virtual Dictionary<string, double> ValidModificationsMonoisotopicMasses => new()
+        {
+            { "[Common Variable:Oxidation on M]", 15.994915 },
+            { "[Common Fixed:Carbamidomethyl on C]", 57.021464 }
+        };
+
+        /// <summary>
         /// Whether to automatically carbamidomethylate unmodified cysteines.
         /// Default is true for Prosit models.
         /// </summary>
@@ -81,6 +92,21 @@ namespace Predictions.Koina.SupportedModels
             foreach (var mod in ValidModificationUnimodMapping)
             {
                 sequence = sequence.Replace(mod.Value, mod.Key);
+            }
+            return sequence;
+        }
+
+        /// <summary>
+        /// Converts a peptide sequence from mzLib modification format to mass-only notation.
+        /// Useful for creating Peptide objects that require numeric mass values.
+        /// </summary>
+        /// <param name="sequence">Peptide sequence in mzLib modification format.</param>
+        /// <returns>The sequence with modifications replaced by their monoisotopic masses.</returns>
+        public virtual string ConvertToMzLibModificationFormatWithMassesOnly(string sequence)
+        {
+            foreach (var mod in ValidModificationsMonoisotopicMasses)
+            {
+                sequence = sequence.Replace(mod.Key, $"[{mod.Value:F6}]");
             }
             return sequence;
         }
