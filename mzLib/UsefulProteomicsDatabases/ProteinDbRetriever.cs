@@ -109,6 +109,18 @@ namespace UsefulProteomicsDatabases
         /// nothing. The download uses UniProt's "stream" endpoint, which returns the whole result set —
         /// "search" would return only its first page of 25.
         /// </para>
+        /// <para>
+        /// A complete proteome is a large download and this method is synchronous: the human proteome as
+        /// gzipped xml is around 400 MB and takes minutes. There is no progress reporting or cancellation,
+        /// so a caller with a user interface should run it on a background thread and say that it will take
+        /// a while.
+        /// </para>
+        /// <para>
+        /// One file name now means something different: asking for fasta isoforms has always produced
+        /// "..._reviewed_isoform.fasta", but until the parameter spelling was fixed that file did not
+        /// actually hold the isoforms. Callers caching by path will find the same name now carries more
+        /// sequences than it used to.
+        /// </para>
         /// </remarks>
         /// <param name="proteomeID">A UniProt proteome ID, e.g. "UP000005640" (Homo sapiens).</param>
         /// <param name="absolutePathToStorageDirectory">An existing directory to write the file into.</param>
@@ -117,8 +129,17 @@ namespace UsefulProteomicsDatabases
         /// Whether to take the reviewed (Swiss-Prot) entries, the unreviewed (TrEMBL) entries, or
         /// <see cref="Reviewed.all"/> of them — the last being the complete organism database.
         /// </param>
-        /// <param name="compress">Whether to save the download gzipped, under a ".gz" name.</param>
-        /// <param name="include">Whether to request extra isoform sequences (fasta only).</param>
+        /// <param name="compress">
+        /// Whether to save the download gzipped, under a ".gz" name. Note that
+        /// <see cref="ProteinDbLoader"/> decompresses a ".gz" database to a fixed "temp" name beside it, so
+        /// two gzipped databases in one directory cannot be loaded at the same time; download them to
+        /// separate directories, or uncompressed, if they are to be read concurrently.
+        /// </param>
+        /// <param name="include">
+        /// Whether to request extra isoform sequences. They are only delivered where they exist: in fasta,
+        /// and among reviewed entries — asking for them alongside <see cref="Reviewed.no"/> is ignored, and
+        /// the file is not named "_isoform" when it could not contain any.
+        /// </param>
         /// <returns>The full path of the file written. Never null.</returns>
         /// <exception cref="ArgumentException">The proteome ID or storage directory is blank, or the proteome ID cannot be used as a file name.</exception>
         /// <exception cref="ArgumentOutOfRangeException">The format is not fasta or xml, or the review status is not a defined <see cref="Reviewed"/> value.</exception>
@@ -144,6 +165,12 @@ namespace UsefulProteomicsDatabases
             if (format != ProteomeFormat.fasta && format != ProteomeFormat.xml)
                 throw new ArgumentOutOfRangeException(nameof(format), format,
                     $"Proteome format '{format}' is not supported; use {nameof(ProteomeFormat.fasta)} or {nameof(ProteomeFormat.xml)}.");
+            // Checked here beside the format, not further down: both are "this argument is not a value this
+            // method accepts", and they should not be reported in a different order depending on which
+            // other argument happens to be wrong as well.
+            if (!Enum.IsDefined(typeof(Reviewed), reviewed))
+                throw new ArgumentOutOfRangeException(nameof(reviewed), reviewed,
+                    $"Review status '{reviewed}' is not a defined {nameof(Reviewed)} value.");
 
             // The proteome ID becomes part of a file name, so refuse anything that could escape the storage
             // directory or, on NTFS, be read as an alternate data stream (a ':' in the name).
@@ -156,12 +183,17 @@ namespace UsefulProteomicsDatabases
                 throw new DirectoryNotFoundException(
                     $"The storage directory '{absolutePathToStorageDirectory}' does not exist; create it before retrieving a proteome.");
 
-            if (!Enum.IsDefined(typeof(Reviewed), reviewed))
-                throw new ArgumentOutOfRangeException(nameof(reviewed), reviewed, "Unknown review status.");
-
             bool compressBool = compress == Compress.yes;
-            // Only a fasta proteome can carry the extra isoform sequences.
-            bool isoformBool = format == ProteomeFormat.fasta && include == IncludeIsoforms.yes;
+
+            // Isoforms are only ever delivered when they can actually arrive, so that a file named
+            // "_isoform" is never one without any in it. Two conditions rule them out: only fasta carries
+            // the extra sequences at all, and isoform ("alternative products") annotation is Swiss-Prot
+            // curation, so an unreviewed-only query has none to give. Verified live across three organisms:
+            // the unreviewed halves of UP000001450, UP000000803 and UP000000589 return 5043, 18080 and
+            // 37597 sequences whether or not isoforms are asked for.
+            bool isoformBool = format == ProteomeFormat.fasta
+                && include == IncludeIsoforms.yes
+                && reviewed != Reviewed.no;
 
             string reviewedSuffix = reviewed switch
             {
@@ -418,11 +450,18 @@ namespace UsefulProteomicsDatabases
         /// and Protein count.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// This is how a caller who knows an organism but not its proteome ID finds one: download the
         /// catalogue, read it with <see cref="UniprotProteomesList"/>, and pass the ID to
         /// <see cref="RetrieveProteome(string, string, ProteomeFormat, Reviewed, Compress, IncludeIsoforms)"/>.
-        /// <see cref="SearchUniProtProteomes(string)"/> answers the same question in one small request when
-        /// the organism is known by name, and is the better choice for anything interactive.
+        /// </para>
+        /// <para>
+        /// It is the complete catalogue, and it is large: over a million proteomes, some 50 MB of text, and
+        /// minutes to transfer. Most of that is redundant strain-level entries. For anything interactive,
+        /// <see cref="SearchUniProtProteomes(string)"/> answers the same question about one organism in a
+        /// single small request and is the better choice; this method is for taking a copy of the whole
+        /// list. UniProt's curated subset can be had by searching "(reference:true)" instead.
+        /// </para>
         /// </remarks>
         /// <param name="destinationFolder">An existing directory to write the file into.</param>
         /// <returns>The full path of the file written. Never null.</returns>
@@ -487,53 +526,66 @@ namespace UsefulProteomicsDatabases
 
         /// <summary>
         /// Asks UniProt which proteomes match a search term — an organism name, a taxonomy ID, or a
-        /// proteome ID — and returns them keyed by proteome ID, valued by organism.
+        /// proteome ID — and returns what it knows about each.
         /// </summary>
         /// <remarks>
         /// <para>
         /// This is the short way round the problem that
         /// <see cref="RetrieveProteome(string, string, ProteomeFormat, Reviewed, Compress, IncludeIsoforms)"/>
         /// is keyed by proteome ID while people know organisms by name. Searching "Homo sapiens" returns
-        /// UP000005640 among its handful of hits, which is the argument the download actually wants; the
-        /// alternative is downloading the whole ~100,000-row catalogue with
-        /// <see cref="DownloadAvailableUniProtProteomes(string)"/> to look up one row.
+        /// UP000005640 among its hits, which is the argument the download actually wants; the alternative is
+        /// downloading the whole catalogue with <see cref="DownloadAvailableUniProtProteomes(string)"/> —
+        /// over a million rows — to look up one of them.
+        /// </para>
+        /// <para>
+        /// The result carries the protein count and taxonomy ID, not just the name, because the name is not
+        /// enough to choose by: UniProt lists <b>two</b> proteomes for Homo sapiens, UP000005640 and
+        /// UP001055169, with the same organism string and the same taxonomy ID 9606, differing only in that
+        /// one holds 147,506 proteins and the other 54,825. A caller picking by name alone picks at random
+        /// between a complete human database and a third of one, with nothing to say which it got. That is
+        /// why this returns a list of records rather than a name-keyed dictionary, and why it is ordered:
+        /// duplicates are real and must survive to the caller.
         /// </para>
         /// <para>
         /// Matching is UniProt's, not this method's: a bare term is a free-text search over the proteomes
         /// collection, and a field-qualified one such as "(organism_id:9606)" or "(upid:UP000005640)" is
-        /// passed through as written. Note that free text matches broadly — "human" finds proteomes whose
-        /// description merely mentions it — so a caller offering these as a choice should show the organism
-        /// names rather than assume one hit.
+        /// passed through as written. Free text matches broadly — "human" returns close to 16,000 proteomes
+        /// whose description merely mentions it, against 44 for "Homo sapiens" and 2 for "(organism_id:9606)"
+        /// — so a field-qualified term is worth preferring.
         /// </para>
         /// <para>
-        /// Like the download, this uses "stream" rather than the paged "search", so the answer is complete.
-        /// A term that matches thousands of organisms therefore returns thousands of rows; that is the
-        /// caller's query, but it is a reason to prefer a specific term.
+        /// Like the download, this uses "stream" rather than the paged "search", so the answer is complete
+        /// and is read into memory whole. That is a few hundred kilobytes for an organism and about 50 MB
+        /// for "*", which is a reason to give it something specific to look for.
         /// </para>
         /// </remarks>
         /// <param name="searchTerm">An organism name, taxonomy ID, proteome ID, or UniProt query expression.</param>
         /// <returns>
-        /// Proteome ID to organism, in the order UniProt returned them. Empty when nothing matches — an
-        /// organism UniProt has no proteome for is an answer, not a fault. Never null.
+        /// The matching proteomes, in the order UniProt returned them — which puts the reference proteome
+        /// first for an organism query. Empty when nothing matches: an organism UniProt has no proteome for
+        /// is an answer, not a fault. Never null.
         /// </returns>
         /// <exception cref="ArgumentException">The search term is blank.</exception>
         /// <exception cref="MzLibException">UniProt rejected the query, or answered in a shape this cannot read.</exception>
         /// <exception cref="HttpRequestException">UniProt was unreachable, timed out, rate-limited the caller, or returned 5xx.</exception>
-        public static Dictionary<string, string> SearchUniProtProteomes(string searchTerm) =>
+        public static IReadOnlyList<UniProtProteome> SearchUniProtProteomes(string searchTerm) =>
             SearchUniProtProteomes(searchTerm, SharedHttpClient);
 
         /// <summary>
         /// <see cref="SearchUniProtProteomes(string)"/> over a caller-supplied <see cref="HttpClient"/>, so
         /// tests can drive the response classification without a live service.
         /// </summary>
-        internal static Dictionary<string, string> SearchUniProtProteomes(string searchTerm, HttpClient httpClient)
+        internal static IReadOnlyList<UniProtProteome> SearchUniProtProteomes(string searchTerm, HttpClient httpClient)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
                 throw new ArgumentException(
                     "A search term is required, e.g. \"Homo sapiens\" or \"(organism_id:9606)\".", nameof(searchTerm));
 
+            // The columns are named rather than left to the server default, so the meaning of each position
+            // is this method's contract and not something UniProt can quietly reorder underneath it. A field
+            // name UniProt does not know is a 400, so a rename would be reported rather than mis-parsed.
             string url = UniProtRestBaseAddress + "proteomes/stream?query=" + Uri.EscapeDataString(searchTerm)
-                + "&format=tsv&compressed=false";
+                + "&format=tsv&compressed=false&fields=upid,organism,organism_id,protein_count";
 
             using HttpResponseMessage response = Get(httpClient, url);
             ThrowIfServiceUnavailable(response, url);
@@ -547,7 +599,7 @@ namespace UsefulProteomicsDatabases
                     $"{(int)response.StatusCode} {response.ReasonPhrase} ('{url}').");
 
             string body = Encoding.UTF8.GetString(ReadBody(response));
-            Dictionary<string, string> proteomes = new();
+            List<UniProtProteome> proteomes = new();
 
             foreach (string line in body.Split('\n'))
             {
@@ -555,11 +607,33 @@ namespace UsefulProteomicsDatabases
                 if (columns.Length < 2 || columns[0] == ProteomeCatalogueIdHeader)
                     continue;
 
-                proteomes[columns[0]] = columns[1];
+                // The two numbers are parsed leniently and default to 0. They are supporting detail — the
+                // ID and the organism are what a caller cannot proceed without — and losing the whole row
+                // because UniProt sent "" for a protein count would be the worse failure.
+                int organismId = columns.Length > 2 && int.TryParse(columns[2], out int parsedOrganismId) ? parsedOrganismId : 0;
+                int proteinCount = columns.Length > 3 && int.TryParse(columns[3], out int parsedCount) ? parsedCount : 0;
+
+                proteomes.Add(new UniProtProteome(columns[0], columns[1], organismId, proteinCount));
             }
 
             return proteomes;
         }
+
+        /// <summary>
+        /// One proteome UniProt offers, as <see cref="SearchUniProtProteomes(string)"/> reports it.
+        /// </summary>
+        /// <param name="ProteomeId">
+        /// The UniProt proteome ID, e.g. "UP000005640" — the argument
+        /// <see cref="RetrieveProteome(string, string, ProteomeFormat, Reviewed, Compress, IncludeIsoforms)"/> takes.
+        /// </param>
+        /// <param name="Organism">The organism name, e.g. "Homo sapiens (Human)". Not unique: an organism may have several proteomes.</param>
+        /// <param name="OrganismId">The NCBI taxonomy ID, e.g. 9606. Also not unique across proteomes. 0 if UniProt did not supply it.</param>
+        /// <param name="ProteinCount">
+        /// How many proteins the proteome holds. Usually the only thing telling two proteomes of the same
+        /// organism apart, so it is what a caller choosing between them should choose on. 0 if UniProt did
+        /// not supply it.
+        /// </param>
+        public record UniProtProteome(string ProteomeId, string Organism, int OrganismId, int ProteinCount);
 
         /// <summary>
         /// Reads a downloaded UniProt proteome catalogue into a dictionary keyed by Proteome ID, valued by
@@ -661,8 +735,24 @@ namespace UsefulProteomicsDatabases
         }
 
         /// <summary>Reads the whole response body, bridged off the caller's context — see <see cref="Get"/>.</summary>
-        private static byte[] ReadBody(HttpResponseMessage response) =>
-            Task.Run(() => response.Content.ReadAsByteArrayAsync()).GetAwaiter().GetResult();
+        /// <remarks>
+        /// The body arrives after the headers <see cref="Get"/> has already classified, so a stall or a
+        /// dropped connection surfaces here rather than at the request. It has to reach the caller as
+        /// <see cref="HttpRequestException"/> for the same reason <c>WriteResponseToFile</c> translates it:
+        /// the documented contract is that one type covers "try again later", and a raw
+        /// <see cref="IOException"/> escaping from here would be a hole in it.
+        /// </remarks>
+        private static byte[] ReadBody(HttpResponseMessage response)
+        {
+            try
+            {
+                return Task.Run(() => response.Content.ReadAsByteArrayAsync()).GetAwaiter().GetResult();
+            }
+            catch (Exception e) when (e is IOException or OperationCanceledException)
+            {
+                throw new HttpRequestException("The UniProt download failed while reading the response body.", e);
+            }
+        }
 
         /// <summary>
         /// Throws <see cref="HttpRequestException"/> if the response says the service — rather than the
