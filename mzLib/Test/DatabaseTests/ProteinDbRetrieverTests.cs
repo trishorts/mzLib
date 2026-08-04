@@ -140,6 +140,32 @@ public class ProteinDbRetrieverTests
 
     private const string OneEntryUniProtFasta = ">sp|P02768|ALBU_HUMAN Serum albumin OS=Homo sapiens\nPEPTIDEMRK\n";
 
+    /// <summary>
+    /// UniProt's proteome catalogue in its real wire shape: a header line, then Proteome Id, Organism,
+    /// Organism Id and Protein count. The header is what used to arrive as a proteome called "Proteome Id".
+    /// </summary>
+    private const string TwoRowCatalogue =
+        "Proteome Id\tOrganism\tOrganism Id\tProtein count\n" +
+        "UP000005640\tHomo sapiens (Human)\t9606\t147506\n" +
+        "UP000000625\tEscherichia coli (strain K12)\t83333\t4403\n";
+
+    /// <summary>
+    /// A response whose body is genuinely gzipped, which the catalogue download now requires: it asks
+    /// UniProt for "compressed=true" and reads the file back to check the catalogue is not empty, so a
+    /// plain-text stand-in would no longer be testing the same path the real one takes.
+    /// </summary>
+    private static HttpResponseMessage GzipResponse(string content, HttpStatusCode status = HttpStatusCode.OK)
+    {
+        using var buffer = new MemoryStream();
+        using (var gzip = new GZipStream(buffer, CompressionMode.Compress, leaveOpen: true))
+        using (var writer = new StreamWriter(gzip, new UTF8Encoding(false)))
+        {
+            writer.Write(content);
+        }
+
+        return new HttpResponseMessage(status) { Content = new ByteArrayContent(buffer.ToArray()) };
+    }
+
     // ---- RetrieveProteome: the call is wrong (no request is made) ------------
 
     [Test]
@@ -354,27 +380,40 @@ public class ProteinDbRetrieverTests
     /// the "reviewed:" query term, so a mutation making the query always-true would name the file
     /// "_unreviewed" and fill it with reviewed proteins without failing anything.
     /// </summary>
+    /// <remarks>
+    /// The expected strings carry "%28proteome%3A...%29" rather than "(proteome:...)" because that is what
+    /// goes on the wire and what <see cref="Uri.ToString"/> reports back on .NET 8, which leaves sub-delims
+    /// and ':' percent-encoded in a query. Both forms are accepted by UniProt; pinning the encoded one keeps
+    /// the assertion honest about the bytes sent.
+    /// </remarks>
     [Test]
-    // format,                                    reviewed,  compress, isoforms, expected count query,                        expected download query
-    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, true,  false, true,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:true&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:true&compressed=false&format=fasta&includeIsoforms:true")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, false, true,  false,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:false&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:false&compressed=true&format=fasta&includeIsoforms:false")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.xml,   true,  true,  false,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:true&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:true&compressed=true&format=xml")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.xml,   false, false, true,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:false&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:false&compressed=false&format=xml")]
+    // format,                                    reviewed,                            compress, isoforms, expected count query,       expected download query
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.yes, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&compressed=false&format=fasta&includeIsoform=true")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.no, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&compressed=true&format=fasta")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.yes, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&compressed=true&format=xml")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.no, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&compressed=false&format=xml")]
+    // Reviewed.all drops the clause rather than asking for both values: its ABSENCE is how UniProt spells
+    // "every entry". A "reviewed:true OR reviewed:false" query would be the obvious-looking mistake here.
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29&compressed=false&format=fasta&includeIsoform=true")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29&compressed=true&format=xml")]
     public void RetrieveProteome_CountsThenStreams_WithTheExactQuery(ProteinDbRetriever.ProteomeFormat format,
-        bool reviewed, bool compress, bool isoforms, string expectedCountUrl, string expectedDownloadUrl)
+        ProteinDbRetriever.Reviewed reviewed, bool compress, bool isoforms, string expectedCountUrl, string expectedDownloadUrl)
     {
         var handler = ProteomeHandler(4, OneEntryUniProtFasta);
 
-        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format,
-            reviewed ? ProteinDbRetriever.Reviewed.yes : ProteinDbRetriever.Reviewed.no,
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format, reviewed,
             compress ? ProteinDbRetriever.Compress.yes : ProteinDbRetriever.Compress.no,
             isoforms ? ProteinDbRetriever.IncludeIsoforms.yes : ProteinDbRetriever.IncludeIsoforms.no,
             new HttpClient(handler));
@@ -382,6 +421,99 @@ public class ProteinDbRetrieverTests
         Assert.That(handler.RequestedUris, Has.Count.EqualTo(2), "one count probe, then one download");
         Assert.That(handler.RequestedUris[0], Is.EqualTo(expectedCountUrl));
         Assert.That(handler.RequestedUris[1], Is.EqualTo(expectedDownloadUrl));
+    }
+
+    /// <summary>
+    /// The parameter this class sent for years was "&amp;includeIsoforms:true" — plural, and joined with a
+    /// colon instead of '=', so it was a parameter NAME with no value and UniProt ignored it. Isoforms were
+    /// therefore never included, in any release, while the file was still named "_isoform". Verified against
+    /// the live API: streaming P02768 returns one sequence with the old spelling and three with this one.
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_IsoformParameter_IsSpelledTheWayUniProtReadsIt()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.yes,
+            new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Last(), Does.Contain("&includeIsoform=true"));
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoforms"),
+            "the plural name is not a UniProt parameter");
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoform:"),
+            "a colon makes it a name with no value, which is how it came to be silently ignored");
+    }
+
+    /// <summary>
+    /// Not asking for isoforms sends no parameter at all rather than "includeIsoform=false" — false is
+    /// already UniProt's default — and xml never carries them, so asking must not put it on an xml URL.
+    /// </summary>
+    [Test]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.IncludeIsoforms.no)]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.IncludeIsoforms.yes)]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.IncludeIsoforms.no)]
+    public void RetrieveProteome_NoIsoformParameterUnlessFastaIsoformsAreWanted(
+        ProteinDbRetriever.ProteomeFormat format, ProteinDbRetriever.IncludeIsoforms include)
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, include, new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoform"));
+    }
+
+    /// <summary>
+    /// The proteome ID is named as a field rather than thrown in as free text. Both find UP000008595 today,
+    /// but only the field-qualified form is the documented contract, and only it stops an ID that also
+    /// appears in some entry's free text from dragging in proteins from another organism.
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_QueriesTheProteomeField_NotFreeText()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no,
+            new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris, Has.All.Contains("query=%28proteome%3AUP000008595%29"));
+        Assert.That(handler.RequestedUris, Has.All.Not.Contains("query=UP000008595"), "the bare ID is free text");
+    }
+
+    /// <summary>
+    /// Reviewed.all is the only value that downloads a complete proteome, so the count it probes for must be
+    /// the whole one. For Homo sapiens that is 147,506 = 20,416 reviewed + 127,090 unreviewed; the halves are
+    /// what the other two values ask for, and neither of them is the database a caller means by "human".
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_All_AsksForEveryEntryNotOneReviewStatus()
+    {
+        var handler = ProteomeHandler(147506, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000005640", _storageDirectory, ProteinDbRetriever.ProteomeFormat.xml,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no,
+            new HttpClient(handler));
+
+        // Matched without the ':' on purpose: the wire form is percent-encoded ("%28reviewed%3Atrue%29"),
+        // so an assertion spelled "reviewed:" would pass whether or not the clause was actually there.
+        Assert.That(handler.RequestedUris, Has.All.Not.Contains("reviewed"),
+            "any reviewed clause narrows the proteome to one of its two halves");
+    }
+
+    /// <summary>An enum value outside the three defined ones must not silently fall through to "all".</summary>
+    [Test]
+    public void RetrieveProteome_UndefinedReviewedValue_ThrowsArgumentOutOfRange()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => ProteinDbRetriever.RetrieveProteome("UP000008595",
+            _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta, (ProteinDbRetriever.Reviewed)42,
+            ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, new HttpClient(handler)));
+
+        Assert.That(ex.ParamName, Is.EqualTo("reviewed"));
+        Assert.That(handler.RequestedUris, Is.Empty, "the call is wrong, so no request is made");
     }
 
     /// <summary>
@@ -423,6 +555,11 @@ public class ProteinDbRetrieverTests
     [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.no, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_unreviewed.xml")]
     // xml carries no isoforms, so asking for them must not change the name
     [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.yes, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.yes, "UP000008595_reviewed.xml")]
+    // Reviewed.all names the file "_all", so a complete proteome is not mistaken on disk for either half
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.fasta")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.yes, ProteinDbRetriever.IncludeIsoforms.yes, "UP000008595_all_isoform.fasta.gz")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.xml")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.yes, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.xml.gz")]
     public void RetrieveProteome_NamesTheFileAsBefore(ProteinDbRetriever.ProteomeFormat format,
         ProteinDbRetriever.Reviewed reviewed, ProteinDbRetriever.Compress compress,
         ProteinDbRetriever.IncludeIsoforms include, string expectedFileName)
@@ -741,21 +878,61 @@ public class ProteinDbRetrieverTests
         Assert.That(Directory.GetFiles(_storageDirectory), Is.Empty);
     }
 
+    /// <summary>
+    /// The catalogue used to come from the paged "search" endpoint, so it held the first 25 of roughly
+    /// 100,000 proteomes and said nothing about the rest — which is why looking Homo sapiens up in it
+    /// failed: UP000005640 was never among the 25 rows that arrived.
+    /// </summary>
+    [Test]
+    public void DownloadAvailableUniProtProteomes_StreamsTheWholeCatalogue_NotThePagedSearchEndpoint()
+    {
+        var handler = new StubHandler(_ => GzipResponse(TwoRowCatalogue));
+
+        ProteinDbRetriever.DownloadAvailableUniProtProteomes(_storageDirectory, new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Single(), Is.EqualTo(
+            "https://rest.uniprot.org/proteomes/stream?query=*&format=tsv&compressed=true"));
+    }
+
+    /// <summary>
+    /// "stream" sends no X-Total-Results header, so emptiness can no longer be spotted from the headers —
+    /// and because the body is gzipped, an empty catalogue is not a zero-byte file either. A header row with
+    /// nothing under it is the shape that has to be caught, and the half-written file must not survive it.
+    /// </summary>
     [Test]
     public void DownloadAvailableUniProtProteomes_EmptyCatalogue_ThrowsMzLibException()
     {
         Assert.Throws<MzLibException>(() => ProteinDbRetriever.DownloadAvailableUniProtProteomes(
-            _storageDirectory, ClientReturning("", HttpStatusCode.OK, totalResults: 0)));
+            _storageDirectory, new HttpClient(new StubHandler(_ => GzipResponse("Proteome Id\tOrganism\n")))));
+
+        Assert.That(Directory.GetFiles(_storageDirectory), Is.Empty);
+    }
+
+    /// <summary>
+    /// gzip was requested, so a 200 carrying anything else is a broken contract rather than an outage —
+    /// exactly the class of failure that used to be written to disk and reported as a success.
+    /// </summary>
+    [Test]
+    public void DownloadAvailableUniProtProteomes_BodyThatIsNotGzip_ThrowsMzLibException()
+    {
+        Assert.Throws<MzLibException>(() => ProteinDbRetriever.DownloadAvailableUniProtProteomes(
+            _storageDirectory, ClientReturning("this is not gzip at all")));
+
+        Assert.That(Directory.GetFiles(_storageDirectory), Is.Empty);
     }
 
     [Test]
-    public void DownloadAvailableUniProtProteomes_Success_WritesTheCatalogue()
+    public void DownloadAvailableUniProtProteomes_Success_WritesACatalogueUniprotProteomesListCanRead()
     {
         string path = ProteinDbRetriever.DownloadAvailableUniProtProteomes(_storageDirectory,
-            ClientReturning("gzip bytes would go here", totalResults: 2));
+            new HttpClient(new StubHandler(_ => GzipResponse(TwoRowCatalogue))));
 
         Assert.That(path, Is.EqualTo(Path.Combine(_storageDirectory, "availableUniProtProteomes.txt.gz")));
-        Assert.That(File.ReadAllText(path), Is.EqualTo("gzip bytes would go here"));
+
+        // The two halves have to fit: what the download writes is what the reader reads.
+        Dictionary<string, string> proteomes = ProteinDbRetriever.UniprotProteomesList(path);
+        Assert.That(proteomes["UP000005640"], Is.EqualTo("Homo sapiens (Human)"));
+        Assert.That(proteomes["UP000000625"], Is.EqualTo("Escherichia coli (strain K12)"));
     }
 
     // ---- UniprotProteomesList -----------------------------------------------
@@ -801,6 +978,155 @@ public class ProteinDbRetrieverTests
         Dictionary<string, string> proteomes = ProteinDbRetriever.UniprotProteomesList(path);
 
         Assert.That(proteomes["UP000005640"], Is.EqualTo("Homo sapiens (Human)"));
+    }
+
+    /// <summary>
+    /// The catalogue's first line is its header. It used to arrive as an entry whose proteome ID was
+    /// "Proteome Id" and whose organism was "Organism" — harmless to iterate past, but this dictionary is
+    /// offered to users as the list of organisms to choose from, and that is not one of them.
+    /// </summary>
+    [Test]
+    public void UniprotProteomesList_SkipsTheHeaderRow()
+    {
+        string path = Path.Combine(_storageDirectory, "availableUniProtProteomes.txt.gz");
+        File.WriteAllBytes(path, GzipResponse(TwoRowCatalogue).Content.ReadAsByteArrayAsync().Result);
+
+        Dictionary<string, string> proteomes = ProteinDbRetriever.UniprotProteomesList(path);
+
+        Assert.That(proteomes, Has.Count.EqualTo(2));
+        Assert.That(proteomes.ContainsKey("Proteome Id"), Is.False, "the header is not a proteome");
+    }
+
+    // ---- SearchUniProtProteomes ---------------------------------------------
+
+    [Test]
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public void SearchUniProtProteomes_BlankTerm_ThrowsArgumentException(string searchTerm)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            ProteinDbRetriever.SearchUniProtProteomes(searchTerm, ClientReturning("unused")));
+        Assert.That(ex.ParamName, Is.EqualTo("searchTerm"));
+    }
+
+    /// <summary>
+    /// "stream" for the same reason as everywhere else in this class: the paged "search" would answer an
+    /// organism with the first 25 of its matches, and silently drop the rest.
+    /// </summary>
+    [Test]
+    public void SearchUniProtProteomes_StreamsTsv()
+    {
+        var handler = new StubHandler(_ => Response(TwoRowCatalogue));
+
+        ProteinDbRetriever.SearchUniProtProteomes("Homo sapiens", new HttpClient(handler));
+
+        // Uri.ToString renders the escaped %20 back as a space; the escaping itself is asserted below.
+        Assert.That(handler.RequestedUris.Single(), Is.EqualTo(
+            "https://rest.uniprot.org/proteomes/stream?query=Homo sapiens&format=tsv&compressed=false"));
+    }
+
+    /// <summary>
+    /// A search term goes through Uri.EscapeDataString, so a space — or anything else a user types into an
+    /// organism box — cannot break out of the query parameter.
+    /// </summary>
+    [Test]
+    public void SearchUniProtProteomes_EscapesTheTerm()
+    {
+        HttpRequestMessage sent = null;
+        var handler = new StubHandler(request => { sent = request; return Response(TwoRowCatalogue); });
+
+        ProteinDbRetriever.SearchUniProtProteomes("Homo sapiens&format=json", new HttpClient(handler));
+
+        Assert.That(sent.RequestUri.AbsoluteUri, Does.Contain("query=Homo%20sapiens%26format%3Djson"));
+        Assert.That(sent.RequestUri.AbsoluteUri, Does.EndWith("&format=tsv&compressed=false"),
+            "the caller's text must not be able to add or replace a parameter");
+    }
+
+    /// <summary>A field-qualified expression is the caller's to write, and must survive intact.</summary>
+    [Test]
+    [TestCase("(organism_id:9606)", "%28organism_id%3A9606%29")]
+    [TestCase("(upid:UP000005640)", "%28upid%3AUP000005640%29")]
+    public void SearchUniProtProteomes_PassesAFieldQualifiedQueryThrough(string searchTerm, string expectedEncoded)
+    {
+        var handler = new StubHandler(_ => Response(TwoRowCatalogue));
+
+        ProteinDbRetriever.SearchUniProtProteomes(searchTerm, new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Single(), Does.Contain("query=" + expectedEncoded));
+    }
+
+    [Test]
+    public void SearchUniProtProteomes_ReadsProteomeIdAndOrganism_WithoutTheHeaderRow()
+    {
+        Dictionary<string, string> proteomes =
+            ProteinDbRetriever.SearchUniProtProteomes("Homo sapiens", ClientReturning(TwoRowCatalogue));
+
+        Assert.That(proteomes, Has.Count.EqualTo(2));
+        Assert.That(proteomes["UP000005640"], Is.EqualTo("Homo sapiens (Human)"));
+        Assert.That(proteomes.ContainsKey("Proteome Id"), Is.False);
+    }
+
+    /// <summary>UniProt sends CRLF line endings; splitting on '\n' must not leave a '\r' on the organism.</summary>
+    [Test]
+    public void SearchUniProtProteomes_ToleratesCarriageReturns()
+    {
+        Dictionary<string, string> proteomes = ProteinDbRetriever.SearchUniProtProteomes("human",
+            ClientReturning(TwoRowCatalogue.Replace("\n", "\r\n")));
+
+        Assert.That(proteomes["UP000000625"], Is.EqualTo("Escherichia coli (strain K12)"));
+    }
+
+    /// <summary>
+    /// An organism UniProt has no proteome for is an answer, not a fault: it comes back as an empty
+    /// dictionary, so a caller can say "no proteomes match" without catching anything.
+    /// </summary>
+    [Test]
+    public void SearchUniProtProteomes_NothingMatches_ReturnsEmptyNotNull()
+    {
+        Dictionary<string, string> proteomes = ProteinDbRetriever.SearchUniProtProteomes("Prototaxites loganii",
+            ClientReturning("Proteome Id\tOrganism\tOrganism Id\tProtein count\n"));
+
+        Assert.That(proteomes, Is.Not.Null);
+        Assert.That(proteomes, Is.Empty);
+    }
+
+    /// <summary>An unparseable query expression is UniProt's 400, and a permanent one — not an outage.</summary>
+    [Test]
+    public void SearchUniProtProteomes_RejectedQuery_ThrowsMzLibException()
+    {
+        var ex = Assert.Throws<MzLibException>(() => ProteinDbRetriever.SearchUniProtProteomes(
+            "(bogus_field:x", ClientReturning("bad query", HttpStatusCode.BadRequest)));
+
+        Assert.That(ex.Message, Does.Contain("bogus_field"));
+    }
+
+    [Test]
+    [TestCase(HttpStatusCode.RequestTimeout)]
+    [TestCase(HttpStatusCode.TooManyRequests)]
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    public void SearchUniProtProteomes_ServiceUnavailable_ThrowsHttpRequestException(HttpStatusCode status)
+    {
+        Assert.Throws<HttpRequestException>(() =>
+            ProteinDbRetriever.SearchUniProtProteomes("Homo sapiens", ClientReturning("down", status)));
+    }
+
+    /// <summary>
+    /// The whole point of the method: the proteome ID it returns is the argument RetrieveProteome wants, so
+    /// a caller who knows only an organism name can get from that name to a complete database.
+    /// </summary>
+    [Test]
+    public void SearchUniProtProteomes_ResultFeedsRetrieveProteome()
+    {
+        string proteomeId = ProteinDbRetriever
+            .SearchUniProtProteomes("Homo sapiens", ClientReturning(TwoRowCatalogue))
+            .First(p => p.Value.StartsWith("Homo sapiens")).Key;
+
+        string path = ProteinDbRetriever.RetrieveProteome(proteomeId, _storageDirectory,
+            ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no,
+            ProteinDbRetriever.IncludeIsoforms.no, ProteomeClient(147506, OneEntryUniProtXml));
+
+        Assert.That(path, Is.EqualTo(Path.Combine(_storageDirectory, "UP000005640_all.xml")));
     }
 
     // ---- the classifiers themselves -----------------------------------------
@@ -1007,6 +1333,149 @@ public class ProteinDbRetrieverLiveTests
 
             Assert.That(ex.Message, Does.Contain("UP000008595"));
             Assert.That(Directory.GetFiles(_storageDirectory), Is.Empty);
+            return Task.CompletedTask;
+        });
+
+    // ---- the complete organism database -------------------------------------
+
+    /// <summary>
+    /// The invariant that makes <see cref="ProteinDbRetriever.Reviewed.all"/> mean "complete": every UniProt
+    /// entry is either reviewed or not, so the whole proteome is exactly the two halves added together.
+    /// Asserted as arithmetic rather than against a fixed count, which UniProt changes whenever it curates.
+    /// Plasmodium falciparum (UP000001450) is the smallest proteome with a substantial amount of both —
+    /// roughly 300 reviewed and 5,000 unreviewed — so neither half can pass for the whole by accident.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveAll_IsBothHalvesTogether() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            int Download(ProteinDbRetriever.Reviewed reviewed) => ProteinDbLoader.LoadProteinFasta(
+                ProteinDbRetriever.RetrieveProteome("UP000001450", _storageDirectory,
+                    ProteinDbRetriever.ProteomeFormat.fasta, reviewed, ProteinDbRetriever.Compress.no,
+                    ProteinDbRetriever.IncludeIsoforms.no),
+                generateTargets: true, DecoyType.None, isContaminant: false, out _).Count;
+
+            int reviewedOnly = Download(ProteinDbRetriever.Reviewed.yes);
+            int unreviewedOnly = Download(ProteinDbRetriever.Reviewed.no);
+            int complete = Download(ProteinDbRetriever.Reviewed.all);
+
+            Assert.That(complete, Is.EqualTo(reviewedOnly + unreviewedOnly),
+                "the complete proteome is the reviewed entries plus the unreviewed ones");
+            Assert.That(complete, Is.GreaterThan(reviewedOnly),
+                "neither half is the complete organism database on its own");
+            Assert.That(complete, Is.GreaterThan(unreviewedOnly));
+
+            // The three downloads must be three files, not one name overwritten three times.
+            Assert.That(Directory.GetFiles(_storageDirectory, "UP000001450_*.fasta"), Has.Length.EqualTo(3));
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// The complete proteome in XML — the format that carries the annotations, and the branch that used to
+    /// save a 404 page. Uukuniemi virus is four proteins, so this proves the path end to end cheaply.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveXmlAll_LoadsTheCompleteProteomeWithAnnotations() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            string path = ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory,
+                ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all,
+                ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no);
+
+            Assert.That(path, Is.EqualTo(Path.Combine(_storageDirectory, "UP000008595_all.xml")));
+
+            List<Protein> proteins = ProteinDbLoader.LoadProteinXML(path, generateTargets: true, DecoyType.None,
+                null, isContaminant: false, null, out _);
+
+            Assert.That(proteins.Select(p => p.Accession),
+                Is.SupersetOf(new[] { "P09613", "P33453", "P22025", "P22026" }));
+            Assert.That(proteins.Any(p => p.DatabaseReferences.Any()), "xml should carry cross-references");
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// Isoforms, which this class asked for with "&amp;includeIsoforms:" — a parameter name with no value —
+    /// and therefore never once received, in any release, while still naming the file "_isoform". Asking now
+    /// has to return strictly more sequences than not asking. A comparison rather than a count, again
+    /// because UniProt curates: P. falciparum's reviewed half is around 318 sequences and 326 with isoforms,
+    /// and only the direction of that difference is a fact about this code.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveIsoforms_ReturnStrictlyMoreSequences() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            int Download(ProteinDbRetriever.IncludeIsoforms include) => ProteinDbLoader.LoadProteinFasta(
+                ProteinDbRetriever.RetrieveProteome("UP000001450", _storageDirectory,
+                    ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.yes,
+                    ProteinDbRetriever.Compress.no, include),
+                generateTargets: true, DecoyType.None, isContaminant: false, out _).Count;
+
+            int withoutIsoforms = Download(ProteinDbRetriever.IncludeIsoforms.no);
+            int withIsoforms = Download(ProteinDbRetriever.IncludeIsoforms.yes);
+
+            Assert.That(withIsoforms, Is.GreaterThan(withoutIsoforms),
+                "a file named _isoform must actually hold the isoforms");
+            return Task.CompletedTask;
+        });
+
+    // ---- finding the organism -----------------------------------------------
+
+    /// <summary>
+    /// The step that makes the rest usable: a caller knows "Homo sapiens", and RetrieveProteome wants
+    /// "UP000005640". UP000005640 is the human reference proteome and is not going to be renumbered.
+    /// </summary>
+    [Test]
+    public Task SearchUniProtProteomes_LiveHomoSapiens_FindsTheHumanReferenceProteome() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            Dictionary<string, string> proteomes = ProteinDbRetriever.SearchUniProtProteomes("Homo sapiens");
+
+            Assert.That(proteomes.ContainsKey("UP000005640"));
+            Assert.That(proteomes["UP000005640"], Does.Contain("Homo sapiens"));
+            Assert.That(proteomes.ContainsKey("Proteome Id"), Is.False);
+            return Task.CompletedTask;
+        });
+
+    /// <summary>A taxonomy ID is the unambiguous way to ask, and must reach UniProt as written.</summary>
+    [Test]
+    public Task SearchUniProtProteomes_LiveTaxonomyId_FindsTheSameProteome() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            Dictionary<string, string> proteomes = ProteinDbRetriever.SearchUniProtProteomes("(organism_id:9606)");
+
+            Assert.That(proteomes.ContainsKey("UP000005640"));
+            Assert.That(proteomes.Values, Has.All.Contains("Homo sapiens"),
+                "a field-qualified organism query must not match anything else");
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// An organism UniProt has no proteome for is an empty answer, not an exception — the distinction that
+    /// lets a caller say "no proteomes match" without catching anything. Prototaxites is a Devonian fungus.
+    /// </summary>
+    [Test]
+    public Task SearchUniProtProteomes_LiveNoSuchOrganism_ReturnsEmpty() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            Assert.That(ProteinDbRetriever.SearchUniProtProteomes("(organism_id:999999999)"), Is.Empty);
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// The catalogue came from the paged "search" endpoint, so it held 25 rows of roughly 100,000 and said
+    /// nothing about the rest — which is why Homo sapiens could not be found in it. The assertion is a floor
+    /// far above one page rather than a count, since UniProt adds proteomes continually.
+    /// </summary>
+    [Test]
+    public Task DownloadAvailableUniProtProteomes_Live_HoldsFarMoreThanOnePage() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            string path = ProteinDbRetriever.DownloadAvailableUniProtProteomes(_storageDirectory);
+            Dictionary<string, string> proteomes = ProteinDbRetriever.UniprotProteomesList(path);
+
+            Assert.That(proteomes, Has.Count.GreaterThan(1000), "one page of 25 is not the catalogue");
+            Assert.That(proteomes.ContainsKey("UP000005640"), "the human proteome must be findable in it");
+            Assert.That(proteomes.ContainsKey("Proteome Id"), Is.False);
             return Task.CompletedTask;
         });
 }
