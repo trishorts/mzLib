@@ -140,6 +140,7 @@ public class ProteinDbRetrieverTests
 
     private const string OneEntryUniProtFasta = ">sp|P02768|ALBU_HUMAN Serum albumin OS=Homo sapiens\nPEPTIDEMRK\n";
 
+
     // ---- RetrieveProteome: the call is wrong (no request is made) ------------
 
     [Test]
@@ -354,27 +355,40 @@ public class ProteinDbRetrieverTests
     /// the "reviewed:" query term, so a mutation making the query always-true would name the file
     /// "_unreviewed" and fill it with reviewed proteins without failing anything.
     /// </summary>
+    /// <remarks>
+    /// The expected strings carry "%28proteome%3A...%29" rather than "(proteome:...)" because that is what
+    /// goes on the wire and what <see cref="Uri.ToString"/> reports back on .NET 8, which leaves sub-delims
+    /// and ':' percent-encoded in a query. Both forms are accepted by UniProt; pinning the encoded one keeps
+    /// the assertion honest about the bytes sent.
+    /// </remarks>
     [Test]
-    // format,                                    reviewed,  compress, isoforms, expected count query,                        expected download query
-    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, true,  false, true,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:true&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:true&compressed=false&format=fasta&includeIsoforms:true")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, false, true,  false,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:false&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:false&compressed=true&format=fasta&includeIsoforms:false")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.xml,   true,  true,  false,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:true&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:true&compressed=true&format=xml")]
-    [TestCase(ProteinDbRetriever.ProteomeFormat.xml,   false, false, true,
-        "https://rest.uniprot.org/uniprotkb/search?query=UP000008595+AND+reviewed:false&format=list&size=0",
-        "https://rest.uniprot.org/uniprotkb/stream?query=UP000008595+AND+reviewed:false&compressed=false&format=xml")]
+    // format,                                    reviewed,                            compress, isoforms, expected count query,       expected download query
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.yes, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&compressed=false&format=fasta&includeIsoform=true")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.no, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&compressed=true&format=fasta")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.yes, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Atrue%29&compressed=true&format=xml")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.no, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29+AND+%28reviewed%3Afalse%29&compressed=false&format=xml")]
+    // Reviewed.all drops the clause rather than asking for both values: its ABSENCE is how UniProt spells
+    // "every entry". A "reviewed:true OR reviewed:false" query would be the obvious-looking mistake here.
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, false, true,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29&compressed=false&format=fasta&includeIsoform=true")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, true, false,
+        "https://rest.uniprot.org/uniprotkb/search?query=%28proteome%3AUP000008595%29&format=list&size=0",
+        "https://rest.uniprot.org/uniprotkb/stream?query=%28proteome%3AUP000008595%29&compressed=true&format=xml")]
     public void RetrieveProteome_CountsThenStreams_WithTheExactQuery(ProteinDbRetriever.ProteomeFormat format,
-        bool reviewed, bool compress, bool isoforms, string expectedCountUrl, string expectedDownloadUrl)
+        ProteinDbRetriever.Reviewed reviewed, bool compress, bool isoforms, string expectedCountUrl, string expectedDownloadUrl)
     {
         var handler = ProteomeHandler(4, OneEntryUniProtFasta);
 
-        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format,
-            reviewed ? ProteinDbRetriever.Reviewed.yes : ProteinDbRetriever.Reviewed.no,
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format, reviewed,
             compress ? ProteinDbRetriever.Compress.yes : ProteinDbRetriever.Compress.no,
             isoforms ? ProteinDbRetriever.IncludeIsoforms.yes : ProteinDbRetriever.IncludeIsoforms.no,
             new HttpClient(handler));
@@ -382,6 +396,120 @@ public class ProteinDbRetrieverTests
         Assert.That(handler.RequestedUris, Has.Count.EqualTo(2), "one count probe, then one download");
         Assert.That(handler.RequestedUris[0], Is.EqualTo(expectedCountUrl));
         Assert.That(handler.RequestedUris[1], Is.EqualTo(expectedDownloadUrl));
+    }
+
+    /// <summary>
+    /// The parameter this class sent for years was "&amp;includeIsoforms:true" — plural, and joined with a
+    /// colon instead of '=', so it was a parameter NAME with no value and UniProt ignored it. Isoforms were
+    /// therefore never included, in any release, while the file was still named "_isoform". Verified against
+    /// the live API: streaming P02768 returns one sequence with the old spelling and three with this one.
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_IsoformParameter_IsSpelledTheWayUniProtReadsIt()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.yes,
+            new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Last(), Does.Contain("&includeIsoform=true"));
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoforms"),
+            "the plural name is not a UniProt parameter");
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoform:"),
+            "a colon makes it a name with no value, which is how it came to be silently ignored");
+    }
+
+    /// <summary>
+    /// Not asking for isoforms sends no parameter at all rather than "includeIsoform=false" — false is
+    /// already UniProt's default — and xml never carries them, so asking must not put it on an xml URL.
+    /// </summary>
+    [Test]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.IncludeIsoforms.no)]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.IncludeIsoforms.yes)]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.IncludeIsoforms.no)]
+    // Isoform annotation is Swiss-Prot curation, so an unreviewed-only query has none to give and asking is
+    // a no-op. Verified live: the unreviewed halves of UP000001450, UP000000803 and UP000000589 return
+    // 5043, 18080 and 37597 sequences whether or not isoforms are requested.
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.no, ProteinDbRetriever.IncludeIsoforms.yes)]
+    public void RetrieveProteome_NoIsoformParameterUnlessIsoformsCanActuallyArrive(
+        ProteinDbRetriever.ProteomeFormat format, ProteinDbRetriever.Reviewed reviewed,
+        ProteinDbRetriever.IncludeIsoforms include)
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, format, reviewed,
+            ProteinDbRetriever.Compress.no, include, new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris.Last(), Does.Not.Contain("includeIsoform"));
+    }
+
+    /// <summary>
+    /// A file called "_isoform" must be one that can hold isoforms. Asking for them alongside
+    /// <see cref="ProteinDbRetriever.Reviewed.no"/> used to produce "UP..._unreviewed_isoform.fasta" that
+    /// was byte-identical to the file without the suffix, because TrEMBL entries carry no isoform
+    /// annotation — the same kind of lie as the "_isoform" files that predated the parameter-spelling fix.
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_UnreviewedIsoforms_DoNotEarnTheIsoformSuffix()
+    {
+        string path = ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory,
+            ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.no, ProteinDbRetriever.Compress.no,
+            ProteinDbRetriever.IncludeIsoforms.yes, ClientReturning("payload", totalResults: 4));
+
+        Assert.That(Path.GetFileName(path), Is.EqualTo("UP000008595_unreviewed.fasta"));
+    }
+
+    /// <summary>
+    /// The proteome ID is named as a field rather than thrown in as free text. Both find UP000008595 today,
+    /// but only the field-qualified form is the documented contract, and only it stops an ID that also
+    /// appears in some entry's free text from dragging in proteins from another organism.
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_QueriesTheProteomeField_NotFreeText()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no,
+            new HttpClient(handler));
+
+        Assert.That(handler.RequestedUris, Has.All.Contains("query=%28proteome%3AUP000008595%29"));
+        Assert.That(handler.RequestedUris, Has.All.Not.Contains("query=UP000008595"), "the bare ID is free text");
+    }
+
+    /// <summary>
+    /// Reviewed.all is the only value that downloads a complete proteome, so the count it probes for must be
+    /// the whole one. For Homo sapiens that is 147,506 = 20,416 reviewed + 127,090 unreviewed; the halves are
+    /// what the other two values ask for, and neither of them is the database a caller means by "human".
+    /// </summary>
+    [Test]
+    public void RetrieveProteome_All_AsksForEveryEntryNotOneReviewStatus()
+    {
+        var handler = ProteomeHandler(147506, OneEntryUniProtFasta);
+
+        ProteinDbRetriever.RetrieveProteome("UP000005640", _storageDirectory, ProteinDbRetriever.ProteomeFormat.xml,
+            ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no,
+            new HttpClient(handler));
+
+        // Matched without the ':' on purpose: the wire form is percent-encoded ("%28reviewed%3Atrue%29"),
+        // so an assertion spelled "reviewed:" would pass whether or not the clause was actually there.
+        Assert.That(handler.RequestedUris, Has.All.Not.Contains("reviewed"),
+            "any reviewed clause narrows the proteome to one of its two halves");
+    }
+
+    /// <summary>An enum value outside the three defined ones must not silently fall through to "all".</summary>
+    [Test]
+    public void RetrieveProteome_UndefinedReviewedValue_ThrowsArgumentOutOfRange()
+    {
+        var handler = ProteomeHandler(4, OneEntryUniProtFasta);
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => ProteinDbRetriever.RetrieveProteome("UP000008595",
+            _storageDirectory, ProteinDbRetriever.ProteomeFormat.fasta, (ProteinDbRetriever.Reviewed)42,
+            ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, new HttpClient(handler)));
+
+        Assert.That(ex.ParamName, Is.EqualTo("reviewed"));
+        Assert.That(handler.RequestedUris, Is.Empty, "the call is wrong, so no request is made");
     }
 
     /// <summary>
@@ -423,6 +551,11 @@ public class ProteinDbRetrieverTests
     [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.no, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_unreviewed.xml")]
     // xml carries no isoforms, so asking for them must not change the name
     [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.yes, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.yes, "UP000008595_reviewed.xml")]
+    // Reviewed.all names the file "_all", so a complete proteome is not mistaken on disk for either half
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.fasta")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.yes, ProteinDbRetriever.IncludeIsoforms.yes, "UP000008595_all_isoform.fasta.gz")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.xml")]
+    [TestCase(ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all, ProteinDbRetriever.Compress.yes, ProteinDbRetriever.IncludeIsoforms.no, "UP000008595_all.xml.gz")]
     public void RetrieveProteome_NamesTheFileAsBefore(ProteinDbRetriever.ProteomeFormat format,
         ProteinDbRetriever.Reviewed reviewed, ProteinDbRetriever.Compress compress,
         ProteinDbRetriever.IncludeIsoforms include, string expectedFileName)
@@ -1007,6 +1140,88 @@ public class ProteinDbRetrieverLiveTests
 
             Assert.That(ex.Message, Does.Contain("UP000008595"));
             Assert.That(Directory.GetFiles(_storageDirectory), Is.Empty);
+            return Task.CompletedTask;
+        });
+
+    // ---- the complete organism database -------------------------------------
+
+    /// <summary>
+    /// The invariant that makes <see cref="ProteinDbRetriever.Reviewed.all"/> mean "complete": every UniProt
+    /// entry is either reviewed or not, so the whole proteome is exactly the two halves added together.
+    /// Asserted as arithmetic rather than against a fixed count, which UniProt changes whenever it curates.
+    /// Plasmodium falciparum (UP000001450) is the smallest proteome with a substantial amount of both —
+    /// roughly 300 reviewed and 5,000 unreviewed — so neither half can pass for the whole by accident.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveAll_IsBothHalvesTogether() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            int Download(ProteinDbRetriever.Reviewed reviewed) => ProteinDbLoader.LoadProteinFasta(
+                ProteinDbRetriever.RetrieveProteome("UP000001450", _storageDirectory,
+                    ProteinDbRetriever.ProteomeFormat.fasta, reviewed, ProteinDbRetriever.Compress.no,
+                    ProteinDbRetriever.IncludeIsoforms.no),
+                generateTargets: true, DecoyType.None, isContaminant: false, out _).Count;
+
+            int reviewedOnly = Download(ProteinDbRetriever.Reviewed.yes);
+            int unreviewedOnly = Download(ProteinDbRetriever.Reviewed.no);
+            int complete = Download(ProteinDbRetriever.Reviewed.all);
+
+            Assert.That(complete, Is.EqualTo(reviewedOnly + unreviewedOnly),
+                "the complete proteome is the reviewed entries plus the unreviewed ones");
+            Assert.That(complete, Is.GreaterThan(reviewedOnly),
+                "neither half is the complete organism database on its own");
+            Assert.That(complete, Is.GreaterThan(unreviewedOnly));
+
+            // The three downloads must be three files, not one name overwritten three times.
+            Assert.That(Directory.GetFiles(_storageDirectory, "UP000001450_*.fasta"), Has.Length.EqualTo(3));
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// The complete proteome in XML — the format that carries the annotations, and the branch that used to
+    /// save a 404 page. Uukuniemi virus is four proteins, so this proves the path end to end cheaply.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveXmlAll_LoadsTheCompleteProteomeWithAnnotations() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            string path = ProteinDbRetriever.RetrieveProteome("UP000008595", _storageDirectory,
+                ProteinDbRetriever.ProteomeFormat.xml, ProteinDbRetriever.Reviewed.all,
+                ProteinDbRetriever.Compress.no, ProteinDbRetriever.IncludeIsoforms.no);
+
+            Assert.That(path, Is.EqualTo(Path.Combine(_storageDirectory, "UP000008595_all.xml")));
+
+            List<Protein> proteins = ProteinDbLoader.LoadProteinXML(path, generateTargets: true, DecoyType.None,
+                null, isContaminant: false, null, out _);
+
+            Assert.That(proteins.Select(p => p.Accession),
+                Is.SupersetOf(new[] { "P09613", "P33453", "P22025", "P22026" }));
+            Assert.That(proteins.Any(p => p.DatabaseReferences.Any()), "xml should carry cross-references");
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// Isoforms, which this class asked for with "&amp;includeIsoforms:" — a parameter name with no value —
+    /// and therefore never once received, in any release, while still naming the file "_isoform". Asking now
+    /// has to return strictly more sequences than not asking. A comparison rather than a count, again
+    /// because UniProt curates: P. falciparum's reviewed half is around 318 sequences and 326 with isoforms,
+    /// and only the direction of that difference is a fact about this code.
+    /// </summary>
+    [Test]
+    public Task RetrieveProteome_LiveIsoforms_ReturnStrictlyMoreSequences() =>
+        ExternalServiceTestHelper.RunAsync("UniProt", () =>
+        {
+            int Download(ProteinDbRetriever.IncludeIsoforms include) => ProteinDbLoader.LoadProteinFasta(
+                ProteinDbRetriever.RetrieveProteome("UP000001450", _storageDirectory,
+                    ProteinDbRetriever.ProteomeFormat.fasta, ProteinDbRetriever.Reviewed.yes,
+                    ProteinDbRetriever.Compress.no, include),
+                generateTargets: true, DecoyType.None, isContaminant: false, out _).Count;
+
+            int withoutIsoforms = Download(ProteinDbRetriever.IncludeIsoforms.no);
+            int withIsoforms = Download(ProteinDbRetriever.IncludeIsoforms.yes);
+
+            Assert.That(withIsoforms, Is.GreaterThan(withoutIsoforms),
+                "a file named _isoform must actually hold the isoforms");
             return Task.CompletedTask;
         });
 }
