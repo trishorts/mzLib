@@ -307,7 +307,10 @@ namespace Readers
                     checkSumType,
                     sourceUri,
                     simpler.id,
-                    simpler.name);
+                    simpler.name)
+                {
+                    InstrumentModel = GetInstrumentModel()
+                };
             }
             else
             {
@@ -325,10 +328,119 @@ namespace Readers
                     sendCheckSum,
                     @"SHA-1",
                     Path.GetFullPath(FilePath),
-                    Path.GetFileNameWithoutExtension(FilePath));
+                    Path.GetFileNameWithoutExtension(FilePath))
+                {
+                    InstrumentModel = GetInstrumentModel()
+                };
             }
             return sourceFile;
         }
+
+        /// <summary>
+        /// The instrument model declared in instrumentConfigurationList, as a PSI-MS cvParam.
+        /// Null when the file does not declare one.
+        ///
+        /// The information was already being read and thrown away: GetMsDataOneBasedScanFromConnection
+        /// walks the same instrumentConfiguration entries but keeps only
+        /// componentList.analyzer[0].cvParam[0], the mass analyzer. The instrument model is a
+        /// cvParam on the instrumentConfiguration element ITSELF, one level up from componentList,
+        /// which is why it never surfaced.
+        ///
+        /// Identifying it: an instrumentConfiguration carries a mixed bag of cvParams -- the model,
+        /// plus things like MS:1000529 (instrument serial number) and MS:1000032 (customization).
+        /// Instrument models are the children of MS:1000031 ("instrument model") in psi-ms.obo, and
+        /// there are several hundred of them, so they cannot be listed here. They are instead
+        /// identified negatively: an MS: cvParam that is not one of the known non-model terms and
+        /// that carries no value is the model. That is exactly how the term is written in practice
+        /// -- a model is a bare presence flag, e.g. <cvParam accession="MS:1001911" name="Q Exactive"
+        /// value=""/> -- whereas serial number and customization both carry a value.
+        ///
+        /// The default configuration is preferred when the run names one; otherwise the first entry
+        /// is used. Instrument model is a property of the run, not of a scan, so no attempt is made
+        /// to resolve it per-scan even though mzML permits per-scan configuration references.
+        ///
+        /// The term is usually NOT a direct child of instrumentConfiguration. ProteoWizard -- which
+        /// converted essentially every vendor file anyone will read -- hoists it into a
+        /// referenceableParamGroup and points at it with referenceableParamGroupRef:
+        ///
+        ///   referenceableParamGroup id="CommonInstrumentParams"
+        ///     cvParam accession="MS:1002732" name="Orbitrap Fusion Lumos" value=""
+        ///     cvParam accession="MS:1000529" name="instrument serial number" value="EXRFSN20410"
+        ///
+        /// so both places must be searched, or every real converted file reports no instrument.
+        /// That pair is also the clearest illustration of the value test above: the model carries no
+        /// value, the serial number does.
+        /// </summary>
+        private CvParam GetInstrumentModel()
+        {
+            var configurations = _mzMLConnection?.instrumentConfigurationList?.instrumentConfiguration;
+            if (configurations == null || configurations.Length == 0)
+                return null;
+
+            var defaultRef = _mzMLConnection.run?.defaultInstrumentConfigurationRef;
+            var configuration = configurations.FirstOrDefault(c => c?.id == defaultRef) ?? configurations[0];
+            if (configuration == null)
+                return null;
+
+            // Direct cvParams first: a file that states the model inline means it, and should not be
+            // overridden by a shared group.
+            var model = FirstInstrumentModel(configuration.cvParam);
+            if (model != null)
+                return model;
+
+            var groups = _mzMLConnection.referenceableParamGroupList?.referenceableParamGroup;
+            if (configuration.referenceableParamGroupRef == null || groups == null)
+                return null;
+
+            foreach (var groupRef in configuration.referenceableParamGroupRef)
+            {
+                var group = groups.FirstOrDefault(g => g?.id == groupRef?.@ref);
+                model = FirstInstrumentModel(group?.cvParam);
+                if (model != null)
+                    return model;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The first cvParam in the list that looks like an instrument model, or null.
+        /// See <see cref="GetInstrumentModel"/> for how "looks like" is decided.
+        /// </summary>
+        private static CvParam FirstInstrumentModel(Generated.CVParamType[] cvParams)
+        {
+            if (cvParams == null)
+                return null;
+
+            foreach (var cv in cvParams)
+            {
+                if (cv?.accession == null || !cv.accession.StartsWith("MS:", StringComparison.Ordinal))
+                    continue;
+                if (NonInstrumentModelAccessions.Contains(cv.accession))
+                    continue;
+                if (!string.IsNullOrEmpty(cv.value))
+                    continue;
+
+                // Value is empty by definition here: a bare presence flag is exactly how the model
+                // term is written, and is the test used above to tell it from serial/customization.
+                return new CvParam("MS", cv.accession, cv.name ?? "", "");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// cvParams that appear on an instrumentConfiguration but are not the instrument model.
+        /// Kept small on purpose: a term wrongly listed here silently suppresses a real model, while
+        /// a term wrongly omitted is caught by the value check in <see cref="GetInstrumentModel"/>,
+        /// since every one of these carries a value and a model does not.
+        /// </summary>
+        private static readonly HashSet<string> NonInstrumentModelAccessions = new(StringComparer.Ordinal)
+        {
+            "MS:1000529", // instrument serial number
+            "MS:1000032", // customization
+            "MS:1000031"  // "instrument model" itself, the parent term -- some writers emit it bare
+        };
 
         /// <summary>
         /// Gets the scan with the specified one-based scan number.
