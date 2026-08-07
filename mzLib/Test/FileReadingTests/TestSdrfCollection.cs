@@ -215,11 +215,28 @@ namespace Test.FileReadingTests
         public void Drift_ValidDocumentsCanStillBeIncomparable()
         {
             // The whole thesis, stated as a test: per-file validity says nothing about whether two
-            // files can be pooled.
-            var a = Doc(new[] { "source name", "assay name", "technology type", "comment[cleavage agent details]" },
-                new[] { "S1", "run 1", "t", "NT=Trypsin;AC=MS:1001251" });
-            var b = Doc(new[] { "source name", "assay name", "technology type", "comment[cleavage agent details]" },
-                new[] { "S2", "run 2", "t", "NT=Trypsin;AC=MS:1001313" });
+            // files can be pooled. Both documents therefore carry every REQUIRED column, so each is
+            // genuinely valid on its own -- the assertion below would be vacuous otherwise.
+            string[] names =
+            {
+                "source name", "characteristics[organism]", "characteristics[organism part]",
+                "characteristics[biological replicate]", "assay name", "technology type",
+                "comment[proteomics data acquisition method]", "comment[label]", "comment[instrument]",
+                "comment[cleavage agent details]", "comment[fraction identifier]",
+                "comment[technical replicate]", "comment[data file]"
+            };
+            var a = Doc(names, new[]
+            {
+                "S1", "homo sapiens", "liver", "1", "run 1", "t",
+                "NT=Data-dependent acquisition;AC=PRIDE:0000627", "label free sample",
+                "NT=Q Exactive;AC=MS:1001911", "NT=Trypsin;AC=MS:1001251", "1", "1", "a.raw"
+            });
+            var b = Doc(names, new[]
+            {
+                "S2", "homo sapiens", "liver", "1", "run 2", "t",
+                "NT=Data-dependent acquisition;AC=PRIDE:0000627", "label free sample",
+                "NT=Q Exactive;AC=MS:1001911", "NT=Trypsin;AC=MS:1001313", "1", "1", "b.raw"
+            });
 
             Assert.That(SdrfValidator.Validate(a).IsValid, Is.True);
             Assert.That(SdrfValidator.Validate(b).IsValid, Is.True);

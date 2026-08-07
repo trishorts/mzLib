@@ -154,7 +154,14 @@ namespace Readers
                             ? row.Cells[source]
                             : "not available";
                     }
-                    cells[sourceColumn] = _labels[d];
+                    // Only stamp our label where the source document had none. Overwriting an
+                    // inherited value destroyed the per-experiment provenance when a merged
+                    // document was merged again -- every row became the outer label, and which
+                    // original experiment a row came from was no longer recoverable. Fixing the
+                    // duplicate column without fixing this left the data loss in place.
+                    if (string.IsNullOrEmpty(cells[sourceColumn])
+                        || cells[sourceColumn] == "not available")
+                        cells[sourceColumn] = _labels[d];
                     rows.Add(new SdrfRow(header, cells));
                 }
             }
@@ -197,12 +204,16 @@ namespace Readers
         /// </summary>
         private static int BlockRank(string columnName)
         {
-            if (string.Equals(columnName, "source name", StringComparison.Ordinal)) return 0;
-            if (columnName.StartsWith("characteristics[", StringComparison.Ordinal)) return 1;
-            if (string.Equals(columnName, "assay name", StringComparison.Ordinal)) return 2;
-            if (string.Equals(columnName, "technology type", StringComparison.Ordinal)) return 3;
-            if (columnName.StartsWith("comment[", StringComparison.Ordinal)) return 4;
-            if (columnName.StartsWith("factor value[", StringComparison.Ordinal)) return 6;
+            if (string.Equals(columnName, "source name", StringComparison.OrdinalIgnoreCase)) return 0;
+            if (columnName.StartsWith("characteristics[", StringComparison.OrdinalIgnoreCase)) return 1;
+            if (string.Equals(columnName, "assay name", StringComparison.OrdinalIgnoreCase)) return 2;
+            if (string.Equals(columnName, "technology type", StringComparison.OrdinalIgnoreCase)) return 3;
+            if (columnName.StartsWith("comment[", StringComparison.OrdinalIgnoreCase)) return 4;
+            // Case-INSENSITIVE, matching SdrfValidator.BlockRank. An ordinal test put
+            // "Factor Value[organism part]" (which the corpus contains) in the unrecognised
+            // bucket, so a merged header ordered it before the comments and the validator then
+            // reported ColumnOrdering on this tool's own output.
+            if (columnName.StartsWith("factor value[", StringComparison.OrdinalIgnoreCase)) return 6;
             return 5; // unrecognised columns sit with the comments, before factor values
         }
     }

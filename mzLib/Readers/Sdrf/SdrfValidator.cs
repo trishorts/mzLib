@@ -23,27 +23,22 @@ namespace Readers
     public static class SdrfValidator
     {
         /// <summary>
-        /// Columns without which a document cannot be joined to anything. Kept deliberately short:
-        /// these are the three that appear in every one of the 1,236 curated corpus files, so
-        /// demanding them condemns nothing that the community considers valid.
+        /// Columns present in EVERY one of the 1,236 curated corpus files, so demanding them
+        /// condemns nothing the community considers valid — which is the whole calibration rule.
+        ///
+        /// There are thirteen, not the three an earlier revision listed. That mistake came from
+        /// reading the survey's OCCURRENCE counts as FILE counts: a column that repeats inflates its
+        /// occurrences, so comment[modification parameters] shows 2,564 occurrences while sitting in
+        /// only 1,176 files, and characteristics[organism] shows 1,242 while being genuinely
+        /// universal. Ten columns that mining actually depends on were being reported as warnings.
         /// </summary>
         public static readonly IReadOnlyList<string> RequiredColumns = new[]
         {
             "source name",
             "assay name",
-            "technology type"
-        };
-
-        /// <summary>
-        /// Columns the specification lists as mandatory for MS-based proteomics but which are
-        /// genuinely absent from part of the curated corpus. Reported as warnings so that the
-        /// validator stays usable against real files.
-        /// </summary>
-        public static readonly IReadOnlyList<string> RecommendedColumns = new[]
-        {
+            "technology type",
             "characteristics[organism]",
             "characteristics[organism part]",
-            "characteristics[disease]",
             "characteristics[biological replicate]",
             "comment[data file]",
             "comment[instrument]",
@@ -52,6 +47,19 @@ namespace Readers
             "comment[technical replicate]",
             "comment[fraction identifier]",
             "comment[proteomics data acquisition method]"
+        };
+
+        /// <summary>
+        /// Columns the specification lists as mandatory but which are genuinely absent from part of
+        /// the curated corpus, so requiring them would invalidate curated data. Warnings.
+        /// characteristics[disease] misses 4 files, characteristics[cell type] 15,
+        /// comment[modification parameters] 60.
+        /// </summary>
+        public static readonly IReadOnlyList<string> RecommendedColumns = new[]
+        {
+            "characteristics[disease]",
+            "characteristics[cell type]",
+            "comment[modification parameters]"
         };
 
         /// <summary>
@@ -194,19 +202,21 @@ namespace Readers
                 int rank = maybeRank.Value;
                 if (rank < previousRank)
                 {
+                    // Report the column that is out of place, then ADOPT its rank. Holding the old
+                    // high-water mark produced a cascade: one misplaced factor value[...] made every
+                    // following column look wrong, so a single defect emitted three messages, none
+                    // of which named the actual offender.
                     messages.Add(new SdrfValidationMessage(
                         SdrfValidationSeverity.Warning, "ColumnOrdering",
-                        $"'{name}' (column {i}) appears after '{header[previousIndex]}' (column " +
-                        $"{previousIndex}). The specification orders columns as source name, then " +
-                        "characteristics[...], then assay name and technology type, then comment[...], " +
-                        "then factor value[...].", null, name));
-                    // Do not reset: one message per out-of-place column, not one per pair.
+                        $"'{header[previousIndex]}' (column {previousIndex}) appears before " +
+                        $"'{name}' (column {i}) but belongs after it. The specification orders " +
+                        "columns as source name, then characteristics[...], then assay name and " +
+                        "technology type, then comment[...], then factor value[...].",
+                        null, header[previousIndex]));
                 }
-                else
-                {
-                    previousRank = rank;
-                    previousIndex = i;
-                }
+
+                previousRank = rank;
+                previousIndex = i;
             }
         }
 
@@ -320,7 +330,11 @@ namespace Readers
             // absent and when the row is too short to reach it, so two rows that both fall short of
             // assay name collapsed onto the same "" key and were reported as duplicates of each
             // other -- a second, wrong diagnosis on top of the RowWidth error they already had.
-            int keyReach = new[] { "source name", "assay name", "comment[label]" }
+            // Reach only as far as the columns a row MUST have to be keyable. comment[label] is
+            // optional -- a missing one reads as "", which is a legitimate key component -- so
+            // including it exempted perfectly keyable rows from the check whenever it happened to
+            // be the rightmost of the three, turning a false positive into a false negative.
+            int keyReach = new[] { "source name", "assay name" }
                 .Select(header.IndexOf)
                 .Where(i => i >= 0)
                 .DefaultIfEmpty(-1)

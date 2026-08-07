@@ -23,30 +23,45 @@ namespace Test.FileReadingTests
         private static string FixtureDir => Path.Combine(
             TestContext.CurrentContext.TestDirectory, "FileReadingTests", "ExternalFileTypes");
 
+        /// <summary>
+        /// A header carrying every Required column (the 13 present in all 1,236 curated files) plus
+        /// the Recommended ones, so a document built on it is genuinely warning-free. Shared, because
+        /// several tests are about ONE rule and should not fail merely for being skeletal.
+        /// </summary>
+        private static SdrfHeader CompleteHeader => new(new[]
+        {
+            "source name", "characteristics[organism]", "characteristics[organism part]",
+            "characteristics[disease]", "characteristics[cell type]",
+            "characteristics[biological replicate]",
+            "assay name", "technology type",
+            "comment[proteomics data acquisition method]", "comment[label]", "comment[instrument]",
+            "comment[cleavage agent details]", "comment[modification parameters]",
+            "comment[fraction identifier]", "comment[technical replicate]", "comment[data file]",
+            "factor value[disease]"
+        });
+
+        /// <summary>One valid row over <see cref="CompleteHeader"/>, plus any extra trailing cells.</summary>
+        private static SdrfRow CompleteRow(SdrfHeader header, string sample, params string[] extras)
+        {
+            var cells = new List<string>
+            {
+                sample, "homo sapiens", "liver", "normal", "epithelial cell", "1",
+                "run " + sample, "proteomic profiling by mass spectrometry",
+                "NT=Data-dependent acquisition;AC=PRIDE:0000627", "label free sample",
+                "NT=Q Exactive;AC=MS:1001911", "NT=Trypsin;AC=MS:1001251",
+                "NT=Oxidation;AC=UNIMOD:35;TA=M;MT=Variable", "1", "1", sample + ".raw",
+                "normal"
+            };
+            cells.AddRange(extras);
+            return new SdrfRow(header, cells);
+        }
+
         /// <summary>A minimal document that should validate with no errors.</summary>
         private static SdrfDocument MinimalValid()
         {
-            var header = new SdrfHeader(new[]
-            {
-                "source name", "characteristics[organism]", "characteristics[organism part]",
-                "characteristics[disease]", "characteristics[biological replicate]",
-                "assay name", "technology type",
-                "comment[proteomics data acquisition method]", "comment[label]", "comment[instrument]",
-                "comment[cleavage agent details]", "comment[fraction identifier]",
-                "comment[technical replicate]", "comment[data file]",
-                "factor value[disease]"
-            });
-
-            SdrfRow Row(string sample, string file) => new(header, new[]
-            {
-                sample, "homo sapiens", "liver", "normal", "1",
-                "run " + sample, "proteomic profiling by mass spectrometry",
-                "NT=Data-dependent acquisition;AC=PRIDE:0000627", "label free sample",
-                "NT=Q Exactive;AC=MS:1001911", "NT=Trypsin;AC=MS:1001251", "1", "1", file,
-                "normal"
-            });
-
-            return new SdrfDocument(header, new[] { Row("Sample 1", "a.raw"), Row("Sample 2", "b.raw") });
+            var header = CompleteHeader;
+            return new SdrfDocument(header,
+                new[] { CompleteRow(header, "Sample 1"), CompleteRow(header, "Sample 2") });
         }
 
         [Test]
@@ -72,8 +87,12 @@ namespace Test.FileReadingTests
         [Test]
         public void MissingRecommendedColumn_IsWarningNotError()
         {
-            var header = new SdrfHeader(new[] { "source name", "assay name", "technology type" });
-            var document = new SdrfDocument(header, new[] { new SdrfRow(header, new[] { "s", "a", "t" }) });
+            // Every REQUIRED column present; only a Recommended one (cell type) removed.
+            var names = CompleteHeader.Where(n => n != "characteristics[cell type]").ToArray();
+            var header = new SdrfHeader(names);
+            var cells = CompleteRow(CompleteHeader, "S1").Cells.ToList();
+            cells.RemoveAt(4);
+            var document = new SdrfDocument(header, new[] { new SdrfRow(header, cells) });
 
             var result = SdrfValidator.Validate(document);
             Assert.That(result.IsValid, Is.True, "a missing recommended column must not invalidate");
@@ -125,8 +144,10 @@ namespace Test.FileReadingTests
         [Test]
         public void UppercaseColumnName_IsWarning()
         {
-            var header = new SdrfHeader(new[] { "source name", "assay name", "technology type", "comment[MS min charge]" });
-            var document = new SdrfDocument(header, new[] { new SdrfRow(header, new[] { "s", "a", "t", "2" }) });
+            var names = CompleteHeader.ToList();
+            names.Add("comment[MS min charge]");
+            var header = new SdrfHeader(names);
+            var document = new SdrfDocument(header, new[] { CompleteRow(header, "S1", "2") });
 
             var result = SdrfValidator.Validate(document);
             Assert.That(result.IsValid, Is.True);
@@ -327,12 +348,18 @@ namespace Test.FileReadingTests
                     $"  {kv.Key,-22} {severityByRule[kv.Key],-9} {kv.Value,5}  {100.0 * kv.Value / files.Length,5:F1}");
             }
 
-            // Observed 2026-08-07 against corpus @ 4f823dcd, after the ordering rule was repaired:
-            // 1,236 files, 1,143 entirely clean (92.5%) -- unchanged, because all three files the
-            // repaired ordering rule flags already carried another warning -- and exactly 1 with an
-            // error (PXD059974,
-            // genuinely ragged). ColumnNameCase 2.8%, ColumnOrdering 0.2% (3 files, all
-            // "assay name" after "technology type").
+            // Observed 2026-08-07 against corpus @ 4f823dcd, after RequiredColumns was corrected
+            // from 3 entries to the 13 that are genuinely universal: 1,236 files, 1,089 entirely
+            // clean (88.1%), and STILL exactly 1 with an error (PXD059974, genuinely ragged).
+            //
+            // That the error count did not move is the whole point. Ten columns were promoted from
+            // Recommended to Required and not one additional curated file became invalid, which is
+            // what "require only what is universal" is supposed to guarantee. The clean rate fell
+            // because RecommendedColumn now fires on 69 files for the three columns that really are
+            // sometimes absent (disease 4, cell type 15, modification parameters 60).
+            //
+            // The earlier 3-column list came from reading the survey's OCCURRENCE counts as FILE
+            // counts.
             //
             // The ordering rule is the reason to keep watching this number. It previously fired on
             // ZERO files -- dead, and reading as coverage. Repairing it naively then made it fire on

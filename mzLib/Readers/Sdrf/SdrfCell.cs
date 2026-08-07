@@ -150,21 +150,20 @@ namespace Readers
                 pairs.TryGetValue("N", out name);
             pairs.TryGetValue("AC", out string? accession);
 
-            // Fall back to the term's own descriptive keys rather than declaring the cell free text.
-            // 493 corpus cells are written in the key=value grammar with neither NT nor AC --
-            // characteristics[pooled sample] (383, SN=...), characteristics[spiked compound] (61)
-            // and factor value[spiked compound] (49) use CT/QY/CN/CV/SN instead. Rejecting them
-            // pushed genuine terms into the free-text bucket and manufactured MixedTermAndFreeText
-            // drift findings on columns where every document had in fact used the grammar.
-            if (string.IsNullOrEmpty(name))
-            {
-                foreach (var key in new[] { "CN", "SN", "CT", "SP" })
-                {
-                    if (pairs.TryGetValue(key, out name) && !string.IsNullOrEmpty(name))
-                        break;
-                }
-            }
-
+            // A cell in the key=value grammar with neither NT nor AC is NOT a controlled-vocabulary
+            // term, and must not be promoted to one.
+            //
+            // An earlier revision fell back to CN/SN/CT/SP here, to stop such cells being reported
+            // as free text. That was worse than the problem. ParseKeyValues is last-wins, and the
+            // dominant real case is characteristics[pooled sample], where a cell carries up to 45
+            // repeated SN= keys ("SN=OSL.53E;SN=OSL.567;..."): the fallback produced a Name that was
+            // one arbitrary member of a list, with an empty accession. Worse, callers branch on this
+            // method, so promoted cells left the free-text index without entering the accession
+            // index -- 538 cells became invisible to every kind of drift analysis at once.
+            //
+            // Returning false routes them to the free-text side, where their values are still
+            // compared. IsTerm still reports true, so a caller that wants the raw pairs can ask
+            // ParseKeyValues for them.
             if (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(accession)) return false;
 
             accession ??= "";

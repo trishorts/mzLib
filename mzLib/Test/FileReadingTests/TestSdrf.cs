@@ -343,6 +343,56 @@ namespace Test.FileReadingTests
             }
         }
 
+        /// <summary>
+        /// Regression: the "validate before opening the stream" fix did not cover a document with
+        /// ZERO rows, which is the case its own comment described.
+        ///
+        /// ResultFile.Results reloads whenever the list is EMPTY, not merely unloaded, so a
+        /// header-only document re-reads from disk on every access. WriteResults touched Results
+        /// again after File.Create had truncated the file, so an in-place write destroyed the
+        /// original and then threw "SDRF file is empty" about the wreckage.
+        /// </summary>
+        [Test]
+        public void WriteInPlace_OnAHeaderOnlyDocument_DoesNotDestroyIt()
+        {
+            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, $"hdr_{Guid.NewGuid():N}.sdrf.tsv");
+            const string original = "source name\tassay name\ttechnology type\r\n";
+            try
+            {
+                File.WriteAllText(path, original, new UTF8Encoding(false));
+
+                var document = new SdrfDocument(path);
+                Assert.That(document.Header.Count, Is.EqualTo(3));
+                Assert.That(document.Results, Is.Empty);
+
+                document.WriteResults(path);
+
+                Assert.That(File.ReadAllText(path), Is.EqualTo(original),
+                    "an in-place write of a header-only document must round-trip, not truncate");
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void WriteInPlace_WithRows_RoundTrips()
+        {
+            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, $"inplace_{Guid.NewGuid():N}.sdrf.tsv");
+            const string original = "source name\tassay name\r\nS1\trun 1\r\nS2\trun 2\r\n";
+            try
+            {
+                File.WriteAllText(path, original, new UTF8Encoding(false));
+                new SdrfDocument(path).WriteResults(path);
+                Assert.That(File.ReadAllText(path), Is.EqualTo(original));
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
+
         [Test]
         public void Write_RejectsCellContainingTab()
         {

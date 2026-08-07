@@ -156,8 +156,16 @@ namespace Readers
             // exactly what this type's stated ethic forbids. Worse, WriteResults(FilePath) truncated
             // the source and then tripped ResultFile's lazy load, which re-read the now-empty file
             // and threw "SDRF file is empty" with the original already gone.
+            // Materialise the rows ONCE, before anything is truncated, and never touch Results
+            // again. ResultFile.Results reloads whenever the list is EMPTY -- not merely unloaded --
+            // so a header-only document re-reads from disk on every access. The previous version
+            // read Results again after File.Create had truncated the file, which on an in-place
+            // write re-read the emptied source and threw "SDRF file is empty" with the original
+            // already gone. That is the exact failure the comment below claimed to have fixed.
+            var rows = Results.ToList();
+
             RejectUnrepresentable(header, "column name", outputPath);
-            foreach (var row in Results)
+            foreach (var row in rows)
                 RejectUnrepresentable(row.Cells, "value", outputPath);
 
             // UTF8Encoding(false) -- no byte-order mark. Encoding.UTF8 emits one, and not one of the
@@ -166,10 +174,10 @@ namespace Readers
             using var writer = new StreamWriter(File.Create(outputPath), new UTF8Encoding(false));
 
             writer.Write(string.Join(CellSeparator, header));
-            for (int i = 0; i < Results.Count; i++)
+            foreach (var row in rows)
             {
                 writer.Write(_lineEnding);
-                writer.Write(string.Join(CellSeparator, Results[i].Cells));
+                writer.Write(string.Join(CellSeparator, row.Cells));
             }
             if (_endsWithNewline)
                 writer.Write(_lineEnding);
