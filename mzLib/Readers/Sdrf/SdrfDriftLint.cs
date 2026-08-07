@@ -60,12 +60,21 @@ namespace Readers
     public sealed record SdrfDriftFinding(
         SdrfDriftKind Kind,
         string Concept,
-        string Column,
+        string? Column,
         IReadOnlyList<SdrfDriftVariant> Variants)
     {
         /// <summary>
-        /// The most common spelling. Useful as the thing to standardise on, since agreeing with the
-        /// majority of existing annotations is what keeps a new document joinable to them.
+        /// The most widely used spelling in the collection.
+        ///
+        /// This describes what the documents DO; it is not advice about what to write. Pooled with
+        /// public data it will frequently name the wrong thing -- in the curated corpus,
+        /// characteristics[organism] is free text in 963 documents against a controlled-vocabulary
+        /// term in 275, so following the majority would mean abandoning the accession. Authored
+        /// values come from the pinned vocabulary regardless of what the majority does.
+        ///
+        /// It is still the right signal for a genuine spelling drift -- casing of a term name,
+        /// prefix style on an accession -- where every variant means the same thing and only one
+        /// is conventional.
         /// </summary>
         public SdrfDriftVariant Majority => Variants[0];
 
@@ -84,8 +93,12 @@ namespace Readers
     /// validator, looks across documents.
     ///
     /// It has a second use. Run over the community's curated corpus it reports how everyone else
-    /// writes a given concept, so a new document can adopt the majority spelling and stay joinable
-    /// to public data instead of drifting away from it.
+    /// writes a given concept -- which is a description of the corpus, NOT a recommendation. Where
+    /// variants are merely spellings of one thing (term-name casing, accession prefix style), the
+    /// majority is worth matching. Where they differ in kind, it is not: most public documents
+    /// write organism as free text, and copying that would throw away the accession. Authored
+    /// values are resolved from the pinned vocabulary irrespective of the majority; tolerating
+    /// other people's free text is this layer's job, not the writer's.
     /// </summary>
     public static class SdrfDriftLint
     {
@@ -109,7 +122,18 @@ namespace Readers
             var findings = new List<SdrfDriftFinding>();
             findings.AddRange(FindColumnNameVariants(collection));
             findings.AddRange(FindValueDrift(collection));
-            return findings;
+
+            // Sorted, because the findings are built by walking Dictionary instances and .NET
+            // guarantees no enumeration order. Returning them unordered is harmless for a console
+            // report and fatal the moment the report becomes an artefact you diff between runs to
+            // see whether the corpus is drifting -- which is the standing check this type exists to
+            // support. Order by impact first so the useful entries stay at the top.
+            return findings
+                .OrderByDescending(f => f.Variants.Skip(1).Sum(v => v.Occurrences))
+                .ThenBy(f => f.Kind)
+                .ThenBy(f => f.Column ?? "", StringComparer.Ordinal)
+                .ThenBy(f => f.Concept, StringComparer.Ordinal)
+                .ToList();
         }
 
         /// <summary>

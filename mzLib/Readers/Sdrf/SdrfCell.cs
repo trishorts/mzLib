@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using MzLibUtil;
 
 namespace Readers
@@ -25,10 +26,73 @@ namespace Readers
         /// CF chemical formula, CT compound type, QY quantity, SP species, CN common name,
         /// ML/MH mass low/high, A generic attribute.
         /// </summary>
-        private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal)
+        private static readonly HashSet<string> KnownKeys = new(StringComparer.OrdinalIgnoreCase)
         {
-            "NT", "AC", "MT", "TA", "VV", "PP", "MM", "SN", "CS", "CF", "CT", "QY", "SP", "CN", "ML", "MH", "A"
+            "NT", "AC", "MT", "TA", "VV", "PP", "MM", "SN", "CS", "CF",
+            "CT", "QY", "SP", "CN", "ML", "MH", "N", "CL", "CV", "PMID"
         };
+
+        /// <summary>
+        /// Keys that actually appear FIRST in a corpus cell: NT (1,459,772), AC (190,369),
+        /// CT (389), SN (383), and N. Everything else in <see cref="KnownKeys"/> only ever appears
+        /// after a semicolon.
+        ///
+        /// "A" was removed from the set entirely. It is a single character, it never leads a real
+        /// cell, and as a leading key it can only ever produce false positives -- any free-text
+        /// value beginning "A=" would have been decoded as a controlled-vocabulary term.
+        /// </summary>
+        private static readonly HashSet<string> KnownLeadingKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "NT", "AC", "CT", "SN", "N", "MT", "TA", "PP", "CS", "CF", "CL", "CV", "MM", "VV"
+        };
+
+        /// <summary>
+        /// Formats a controlled-vocabulary term as an SDRF cell: "NT=Oxidation;AC=UNIMOD:35".
+        ///
+        /// NT first, then AC, then any extra keys in the order given -- the specification's own
+        /// examples put the name first, and the curated corpus agrees overwhelmingly (NT leads
+        /// 1,459,772 cells, AC 190,369).
+        ///
+        /// The accession is written EXACTLY as supplied. This deliberately does not "helpfully"
+        /// upper-case or add a missing prefix: the corpus is full of drift the caller should not be
+        /// able to launder through here -- bare "4" for UNIMOD:4 in 39 documents, "Unimod:35" in 22,
+        /// bare "1001251" for Trypsin in 39. Authored terms are meant to come from the pinned
+        /// vocabulary already correct; silently repairing a wrong one here would hide the bug and
+        /// make the drift lint's job impossible.
+        /// </summary>
+        /// <param name="term">The term. Name and Accession may not both be empty.</param>
+        /// <param name="extras">
+        /// Additional key=value pairs in document order, e.g. ("TA","M"), ("MT","Variable").
+        /// Keys are emitted as given; a null or empty value is skipped.
+        /// </param>
+        public static string ToCell(CvParam term, params (string Key, string Value)[] extras)
+        {
+            if (term is null) throw new ArgumentNullException(nameof(term));
+            if (string.IsNullOrEmpty(term.Name) && string.IsNullOrEmpty(term.Accession))
+                throw new ArgumentException(
+                    "A controlled-vocabulary term needs at least a name or an accession.", nameof(term));
+
+            var parts = new List<string>(2 + (extras?.Length ?? 0));
+            if (!string.IsNullOrEmpty(term.Name)) parts.Add("NT=" + term.Name);
+            if (!string.IsNullOrEmpty(term.Accession)) parts.Add("AC=" + term.Accession);
+
+            foreach (var (key, value) in extras ?? Array.Empty<(string, string)>())
+            {
+                if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value)) continue;
+                parts.Add(key + "=" + value);
+            }
+
+            string cell = string.Join(";", parts);
+
+            // A separator inside a value would silently invent or merge keys on read. There is no
+            // escape mechanism, so the only honest response is to refuse.
+            if (cell.IndexOf('\t') >= 0 || cell.IndexOf('\n') >= 0 || cell.IndexOf('\r') >= 0)
+                throw new ArgumentException(
+                    $"An SDRF cell cannot contain a tab or newline; the format defines no escape " +
+                    $"mechanism. Offending term: '{cell}'.", nameof(term));
+
+            return cell;
+        }
 
         /// <summary>
         /// True when the cell is written in the key=value grammar rather than being free text.
@@ -40,7 +104,11 @@ namespace Readers
             if (equals <= 0) return false;
             int semicolon = cell.IndexOf(';');
             if (semicolon >= 0 && semicolon < equals) return false;
-            return KnownKeys.Contains(cell.Substring(0, equals).Trim());
+
+            // Case-insensitive, matching ParseKeyValues. These disagreed before: the leading key was
+            // compared Ordinal while every later key was compared OrdinalIgnoreCase, so
+            // "NT=Ox;ac=UNIMOD:35" parsed but "nt=Ox;AC=UNIMOD:35" was silently free text.
+            return KnownLeadingKeys.Contains(cell.Substring(0, equals).Trim());
         }
 
         /// <summary>
@@ -70,21 +138,41 @@ namespace Readers
         /// The CV label is derived from the accession prefix ("MS:1001911" -> "MS"), because SDRF
         /// cells do not carry one separately the way an mzML cvParam does.
         /// </summary>
-        public static bool TryParseTerm(string cell, out CvParam term)
+        public static bool TryParseTerm(string cell, [MaybeNullWhen(false)] out CvParam term)
         {
             term = null;
             var pairs = ParseKeyValues(cell);
             if (pairs.Count == 0) return false;
 
-            pairs.TryGetValue("NT", out string name);
-            pairs.TryGetValue("AC", out string accession);
+            // "N" is an alternative spelling of the name key -- PXD039582 writes N=Orbitrap in
+            // comment[ms2 analyzer type] 27 times.
+            if (!pairs.TryGetValue("NT", out string? name))
+                pairs.TryGetValue("N", out name);
+            pairs.TryGetValue("AC", out string? accession);
+
+            // Fall back to the term's own descriptive keys rather than declaring the cell free text.
+            // 493 corpus cells are written in the key=value grammar with neither NT nor AC --
+            // characteristics[pooled sample] (383, SN=...), characteristics[spiked compound] (61)
+            // and factor value[spiked compound] (49) use CT/QY/CN/CV/SN instead. Rejecting them
+            // pushed genuine terms into the free-text bucket and manufactured MixedTermAndFreeText
+            // drift findings on columns where every document had in fact used the grammar.
+            if (string.IsNullOrEmpty(name))
+            {
+                foreach (var key in new[] { "CN", "SN", "CT", "SP" })
+                {
+                    if (pairs.TryGetValue(key, out name) && !string.IsNullOrEmpty(name))
+                        break;
+                }
+            }
+
             if (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(accession)) return false;
 
             accession ??= "";
+            name ??= "";
             int colon = accession.IndexOf(':');
             string cvLabel = colon > 0 ? accession.Substring(0, colon) : "";
 
-            term = new CvParam(cvLabel, accession, name ?? "", "");
+            term = new CvParam(cvLabel, accession, name, "");
             return true;
         }
     }

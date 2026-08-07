@@ -226,6 +226,88 @@ namespace Test.FileReadingTests
             Assert.That(SdrfDriftLint.Analyze(new SdrfCollection(new[] { a, b }, new[] { "A", "B" })), Is.Not.Empty);
         }
 
+        // ---------------- cell formatting ----------------
+
+        [Test]
+        public void ToCell_RoundTripsThroughTryParseTerm()
+        {
+            var term = new MzLibUtil.CvParam("UNIMOD", "UNIMOD:35", "Oxidation", "");
+            string cell = SdrfCell.ToCell(term, ("TA", "M"), ("MT", "Variable"));
+
+            Assert.That(cell, Is.EqualTo("NT=Oxidation;AC=UNIMOD:35;TA=M;MT=Variable"));
+            Assert.That(SdrfCell.IsTerm(cell), Is.True);
+            Assert.That(SdrfCell.TryParseTerm(cell, out var parsed), Is.True);
+            Assert.That(parsed!.Accession, Is.EqualTo("UNIMOD:35"));
+            Assert.That(parsed.Name, Is.EqualTo("Oxidation"));
+
+            var pairs = SdrfCell.ParseKeyValues(cell);
+            Assert.That(pairs["TA"], Is.EqualTo("M"));
+            Assert.That(pairs["MT"], Is.EqualTo("Variable"));
+        }
+
+        [Test]
+        public void ToCell_WritesTheAccessionVerbatim()
+        {
+            // Deliberately does NOT upper-case or add a missing prefix. The corpus is full of that
+            // drift (bare "4", "Unimod:35", bare "1001251") and laundering it here would hide the
+            // bug and make the drift lint's job impossible.
+            var sloppy = new MzLibUtil.CvParam("", "4", "Carbamidomethyl", "");
+            Assert.That(SdrfCell.ToCell(sloppy), Is.EqualTo("NT=Carbamidomethyl;AC=4"));
+        }
+
+        [Test]
+        public void ToCell_RejectsASeparatorInsideAValue()
+        {
+            var term = new MzLibUtil.CvParam("MS", "MS:1001911", "Q\tExactive", "");
+            Assert.That(() => SdrfCell.ToCell(term), Throws.TypeOf<ArgumentException>());
+        }
+
+        [Test]
+        public void ToCell_RequiresANameOrAnAccession()
+        {
+            Assert.That(() => SdrfCell.ToCell(new MzLibUtil.CvParam("", "", "", "")),
+                Throws.TypeOf<ArgumentException>());
+        }
+
+        [Test]
+        public void Drift_FindingOrderIsDeterministic()
+        {
+            // Findings are built by walking Dictionary instances, which guarantee no enumeration
+            // order. Unordered output is harmless in a console report and fatal the moment the
+            // report is diffed between runs to see whether the corpus is drifting.
+            var a = Doc(new[] { "source name", "assay name", "technology type", "comment[instrument]", "comment[label]" },
+                new[] { "S1", "run 1", "t", "NT=Q Exactive;AC=MS:1001911", "label free sample" });
+            var b = Doc(new[] { "source name", "assay name", "technology type", "comment[instrument]", "comment[label]" },
+                new[] { "S2", "run 2", "t", "NT=q exactive;AC=MS:1001911", "Label Free Sample" });
+
+            var collection = new SdrfCollection(new[] { a, b }, new[] { "A", "B" });
+
+            var first = SdrfDriftLint.Analyze(collection).Select(f => f.ToString()).ToList();
+            for (int i = 0; i < 5; i++)
+            {
+                var again = SdrfDriftLint.Analyze(collection).Select(f => f.ToString()).ToList();
+                Assert.That(again, Is.EqualTo(first));
+            }
+            Assert.That(first, Is.Not.Empty);
+        }
+
+        [Test]
+        public void Merge_DoesNotDuplicateAnExistingProvenanceColumn()
+        {
+            // Merging a merged document is the obvious incremental workflow. Appending the
+            // provenance column unconditionally duplicated it, overwrote the original document's
+            // provenance, and left the new one "not available" on every row.
+            var a = Doc(new[] { "source name", "assay name", "technology type" }, new[] { "S1", "run 1", "t" });
+            var b = Doc(new[] { "source name", "assay name", "technology type" }, new[] { "S2", "run 2", "t" });
+
+            var once = new SdrfCollection(new[] { a, b }, new[] { "A", "B" }).Merge();
+            var twice = new SdrfCollection(new[] { once }, new[] { "MERGED" }).Merge();
+
+            Assert.That(twice.Header.IndexesOf(SdrfCollection.SourceDocumentColumn).Count, Is.EqualTo(1));
+            Assert.That(twice.Results.Select(r => r[SdrfCollection.SourceDocumentColumn]),
+                Has.None.EqualTo("not available"));
+        }
+
         [Test]
         public void Collection_FromFiles_LabelsByAccession()
         {
@@ -236,7 +318,14 @@ namespace Test.FileReadingTests
             });
 
             Assert.That(collection.Count, Is.EqualTo(2));
-            Assert.That(collection.Labels, Is.EqualTo(new[] { "PXD000070", "PXD026824" }));
+
+            // Labels are folder-qualified, not bare file names: every search writes its SDRF into
+            // its own output folder, so N re-searches of one experiment share a base name and bare
+            // names would collide.
+            Assert.That(collection.Labels.Count, Is.EqualTo(2));
+            Assert.That(collection.Labels[0], Does.EndWith("PXD000070"));
+            Assert.That(collection.Labels[1], Does.EndWith("PXD026824"));
+            Assert.That(collection.Labels[0], Is.Not.EqualTo(collection.Labels[1]));
             Assert.That(collection.Merge().Results.Count,
                 Is.EqualTo(collection[0].Results.Count + collection[1].Results.Count));
         }

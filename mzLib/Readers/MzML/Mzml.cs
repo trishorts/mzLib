@@ -421,6 +421,23 @@ namespace Readers
                 if (!string.IsNullOrEmpty(cv.value))
                     continue;
 
+                // A model must be NAMED. cvParam/@name is optional in the schema, and a term with an
+                // accession but no name is useless downstream -- it cannot be written into an SDRF
+                // cell or matched against anything.
+                if (string.IsNullOrWhiteSpace(cv.name))
+                    continue;
+
+                // Reject the abstract vendor branch nodes. PSI-MS names every one of them
+                // "<Vendor> instrument model" -- MS:1000483 Thermo Fisher Scientific, MS:1000122
+                // Bruker Daltonics, MS:1000126 Waters, MS:1000121 SCIEX, MS:1000490 Agilent,
+                // MS:1000489 Shimadzu, MS:1000495 Applied Biosystems -- and they are valueless, so
+                // the value test alone lets every one of them through. badScan7192.mzML in this
+                // repo's own test data carries MS:1000483 and would otherwise be reported, and then
+                // WRITTEN, as though it identified an instrument. Matching the naming convention
+                // rather than listing accessions catches vendors nobody has added yet.
+                if (cv.name.EndsWith("instrument model", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 // Value is empty by definition here: a bare presence flag is exactly how the model
                 // term is written, and is the test used above to tell it from serial/customization.
                 return new CvParam("MS", cv.accession, cv.name ?? "", "");

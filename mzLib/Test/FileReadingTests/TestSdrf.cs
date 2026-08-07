@@ -217,6 +217,132 @@ namespace Test.FileReadingTests
             }
         }
 
+        /// <summary>
+        /// The line ending must come from the FILE, not from the platform or from a survey.
+        ///
+        /// Regression for a real defect: the writer pinned CRLF because a corpus survey reported
+        /// "all 1,236 files are CRLF". That survey measured a working tree on a machine with
+        /// core.autocrlf=true; upstream the corpus is LF. The pinned writer therefore flipped every
+        /// real file's endings, and the byte-identical round-trip test only passed because git was
+        /// silently supplying the CRs it was asserting on.
+        /// </summary>
+        [Test]
+        [TestCase("\n")]
+        [TestCase("\r\n")]
+        [TestCase("\r")]
+        public void RoundTrip_PreservesLineEnding(string lineEnding)
+        {
+            string source = Path.Combine(TestContext.CurrentContext.TestDirectory, $"eol_{Guid.NewGuid():N}.sdrf.tsv");
+            string output = Path.Combine(TestContext.CurrentContext.TestDirectory, $"eol_out_{Guid.NewGuid():N}.sdrf.tsv");
+            string text = string.Join(lineEnding, "source name\tassay name", "S1\trun 1", "S2\trun 2") + lineEnding;
+            try
+            {
+                File.WriteAllText(source, text, new UTF8Encoding(false));
+
+                var document = new SdrfDocument(source);
+                Assert.That(document.Results.Count, Is.EqualTo(2));
+                document.WriteResults(output);
+
+                Assert.That(File.ReadAllBytes(output), Is.EqualTo(File.ReadAllBytes(source)));
+            }
+            finally
+            {
+                foreach (var p in new[] { source, output })
+                    if (File.Exists(p)) File.Delete(p);
+            }
+        }
+
+        [Test]
+        public void RoundTrip_PreservesAbsentTrailingNewline()
+        {
+            string source = Path.Combine(TestContext.CurrentContext.TestDirectory, $"noeol_{Guid.NewGuid():N}.sdrf.tsv");
+            string output = Path.Combine(TestContext.CurrentContext.TestDirectory, $"noeol_out_{Guid.NewGuid():N}.sdrf.tsv");
+            try
+            {
+                File.WriteAllText(source, "source name\tassay name\nS1\trun 1", new UTF8Encoding(false));
+
+                new SdrfDocument(source).WriteResults(output);
+
+                Assert.That(File.ReadAllBytes(output), Is.EqualTo(File.ReadAllBytes(source)));
+            }
+            finally
+            {
+                foreach (var p in new[] { source, output })
+                    if (File.Exists(p)) File.Delete(p);
+            }
+        }
+
+        [Test]
+        public void LoneCarriageReturn_IsALineBreak()
+        {
+            // Treating only LF as a break collapsed an old-Mac file into one line: a header of one
+            // oddly-named column and zero rows, which the validator then reported as "NoRows" -- a
+            // confident, completely wrong diagnosis of a file full of data.
+            string source = Path.Combine(TestContext.CurrentContext.TestDirectory, $"cr_{Guid.NewGuid():N}.sdrf.tsv");
+            try
+            {
+                File.WriteAllText(source, "source name\tassay name\rS1\trun 1\r", new UTF8Encoding(false));
+
+                var document = new SdrfDocument(source);
+                Assert.That(document.Header.Count, Is.EqualTo(2));
+                Assert.That(document.Results.Count, Is.EqualTo(1));
+                Assert.That(document.Results[0]["source name"], Is.EqualTo("S1"));
+            }
+            finally
+            {
+                if (File.Exists(source)) File.Delete(source);
+            }
+        }
+
+        [Test]
+        public void Write_RejectsHeaderContainingTab()
+        {
+            // The more dangerous of the two omissions: authored column names are built from run
+            // metadata, and a tab in one emits N+1 columns, leaving every row one narrower than the
+            // header and the whole document silently misaligned.
+            var header = new SdrfHeader(new[] { "source name", "characteristics[organism\tpart]" });
+            var document = new SdrfDocument(header, new[] { new SdrfRow(header, new[] { "S1", "liver" }) });
+
+            string outputPath = Path.Combine(TestContext.CurrentContext.TestDirectory, $"badhdr_{Guid.NewGuid():N}.sdrf.tsv");
+            try
+            {
+                Assert.That(() => document.WriteResults(outputPath), Throws.TypeOf<MzLibException>());
+            }
+            finally
+            {
+                if (File.Exists(outputPath)) File.Delete(outputPath);
+            }
+        }
+
+        [Test]
+        public void Write_RejectingABadCell_DoesNotTouchTheOutputFile()
+        {
+            // File.Create truncates. Validating inside the write loop meant the guard destroyed the
+            // file it was refusing to write -- and writing in place over a document deleted the
+            // original, then threw "SDRF file is empty" when the lazy load re-read the wreckage.
+            var header = new SdrfHeader(new[] { "source name", "assay name" });
+            var document = new SdrfDocument(header, new[]
+            {
+                new SdrfRow(header, new[] { "S1", "run 1" }),
+                new SdrfRow(header, new[] { "S2\tbad", "run 2" })
+            });
+
+            string outputPath = Path.Combine(TestContext.CurrentContext.TestDirectory, $"keep_{Guid.NewGuid():N}.sdrf.tsv");
+            const string existing = "PRECIOUS EXISTING CONTENT";
+            try
+            {
+                File.WriteAllText(outputPath, existing);
+
+                Assert.That(() => document.WriteResults(outputPath), Throws.TypeOf<MzLibException>());
+                Assert.That(File.ReadAllText(outputPath), Is.EqualTo(existing),
+                    "the guard truncated the very file it refused to write");
+            }
+            finally
+            {
+                if (File.Exists(outputPath)) File.Delete(outputPath);
+            }
+        }
+
         [Test]
         public void Write_RejectsCellContainingTab()
         {

@@ -64,6 +64,20 @@ namespace Test.FileReadingTests
         }
 
         [Test]
+        public void MzML_VendorBranchNodeIsNotReportedAsAModel()
+        {
+            // badScan7192.mzML declares MS:1000483 "Thermo Fisher Scientific instrument model" --
+            // the abstract vendor node, valueless, sitting exactly where a real model would sit.
+            // The value test alone lets it through, and since the writer change it would then be
+            // written into every mzML as though it identified an instrument.
+            var file = MsDataFileReader.GetDataFile(Data(@"DataFiles\badScan7192.mzML"));
+            var model = file.GetSourceFile().InstrumentModel;
+
+            Assert.That(model, Is.Null,
+                "a vendor branch node says which company made the instrument, not which instrument");
+        }
+
+        [Test]
         public void InstrumentModel_DefaultsToNullWhenUnset()
         {
             // Init-only and unset: every pre-existing SourceFile construction site is unaffected.

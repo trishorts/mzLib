@@ -188,6 +188,74 @@ namespace Test.FileReadingTests
             Assert.That(result.Warnings.Any(w => w.Rule == "ColumnOrdering"));
         }
 
+        /// <summary>
+        /// Regression: the original rule compared only two pairs of extremes, fired ZERO times
+        /// across all 1,236 curated files, and could not detect the violation its own summary
+        /// described. Both cases below produced no message.
+        /// </summary>
+        [Test]
+        public void SampleMetadataAfterDataFileMetadata_IsOrderingWarning()
+        {
+            var header = new SdrfHeader(new[]
+                { "source name", "assay name", "technology type", "characteristics[organism]", "comment[data file]" });
+            var document = new SdrfDocument(header,
+                new[] { new SdrfRow(header, new[] { "s", "a", "t", "homo sapiens", "x.raw" }) });
+
+            var result = SdrfValidator.Validate(document);
+            Assert.That(result.Warnings.Any(w => w.Rule == "ColumnOrdering"), Is.True,
+                "characteristics[...] after assay name is out of block order");
+        }
+
+        [Test]
+        public void SourceNameNotFirst_IsOrderingWarning()
+        {
+            var header = new SdrfHeader(new[]
+                { "characteristics[organism]", "source name", "assay name", "technology type", "comment[data file]" });
+            var document = new SdrfDocument(header,
+                new[] { new SdrfRow(header, new[] { "homo sapiens", "s", "a", "t", "x.raw" }) });
+
+            var result = SdrfValidator.Validate(document);
+            Assert.That(result.Warnings.Any(w => w.Rule == "ColumnOrdering"), Is.True,
+                "nothing previously checked the position of source name at all");
+        }
+
+        [Test]
+        public void MixedCaseFactorValue_DoesNotDisarmOrderingOrFalselyTrigger()
+        {
+            // Ordinal matching meant "Factor Value[...]" (which the corpus contains) silently
+            // disarmed the rule, while a mixed-case pair elsewhere produced a false positive.
+            var header = new SdrfHeader(new[]
+                { "source name", "assay name", "technology type", "comment[data file]", "Factor Value[organism part]" });
+            var document = new SdrfDocument(header,
+                new[] { new SdrfRow(header, new[] { "s", "a", "t", "x.raw", "liver" }) });
+
+            var result = SdrfValidator.Validate(document);
+            Assert.That(result.Warnings.Any(w => w.Rule == "ColumnOrdering"), Is.False,
+                "this header IS correctly ordered; only its casing is wrong");
+            Assert.That(result.Warnings.Any(w => w.Rule == "ColumnNameCase"), Is.True,
+                "the casing is reported separately, which is where it belongs");
+        }
+
+        [Test]
+        public void ShortRows_DoNotManufactureDuplicateKeyErrors()
+        {
+            // Two rows too short to reach assay name both keyed as "" and were reported as
+            // duplicates of one another -- a second, wrong diagnosis on top of the RowWidth error
+            // they already had.
+            var header = new SdrfHeader(new[] { "source name", "assay name", "technology type" });
+            var document = new SdrfDocument(header, new[]
+            {
+                new SdrfRow(header, new[] { "S1" }),
+                new SdrfRow(header, new[] { "S2" })
+            });
+
+            var result = SdrfValidator.Validate(document);
+
+            Assert.That(result.Errors.Count(e => e.Rule == "RowWidth"), Is.EqualTo(2));
+            Assert.That(result.Errors.Any(e => e.Rule == "RowKeyUniqueness"), Is.False,
+                "a row that cannot be keyed must not be reported as a duplicate");
+        }
+
         [Test]
         public void RaggedCorpusFile_IsReportedAsError()
         {
@@ -259,9 +327,17 @@ namespace Test.FileReadingTests
                     $"  {kv.Key,-22} {severityByRule[kv.Key],-9} {kv.Value,5}  {100.0 * kv.Value / files.Length,5:F1}");
             }
 
-            // Observed 2026-08-06 against corpus @ 4f823dcd: 1,236 files, 1,143 entirely clean
-            // (92.5%), exactly 1 with an error (PXD059974, genuinely ragged). Highest-firing
-            // warning was ColumnNameCase at 2.8%.
+            // Observed 2026-08-07 against corpus @ 4f823dcd, after the ordering rule was repaired:
+            // 1,236 files, 1,143 entirely clean (92.5%) -- unchanged, because all three files the
+            // repaired ordering rule flags already carried another warning -- and exactly 1 with an
+            // error (PXD059974,
+            // genuinely ragged). ColumnNameCase 2.8%, ColumnOrdering 0.2% (3 files, all
+            // "assay name" after "technology type").
+            //
+            // The ordering rule is the reason to keep watching this number. It previously fired on
+            // ZERO files -- dead, and reading as coverage. Repairing it naively then made it fire on
+            // 31, of which 28 were wrong, because ranking unrecognised columns forced legitimate
+            // sample columns like "material type" after the comment block.
             //
             // The bounds are loose enough to survive corpus growth but tight enough that promoting
             // any warning to an error, or adding an over-eager rule, fails here rather than quietly

@@ -95,7 +95,15 @@ namespace Readers
                     .SelectMany(x => Enumerable.Repeat(x.name, maxMultiplicity[x.name]))
                     .ToList();
 
-                ordered.Add(SourceDocumentColumn);
+                // Only append the provenance column if the inputs do not already carry one.
+                // Appending unconditionally duplicated the name when a MERGED document was fed back
+                // into a collection -- the obvious incremental workflow, and one Merge_IsWritableAsSdrf
+                // shows is supported. IndexOf then bound the label to the inherited column,
+                // overwriting the original document's provenance, while the appended column filled
+                // with "not available" on every row and the header grew by one per merge generation.
+                if (!ordered.Contains(SourceDocumentColumn, StringComparer.Ordinal))
+                    ordered.Add(SourceDocumentColumn);
+
                 return new SdrfHeader(ordered);
             }
         }
@@ -158,10 +166,31 @@ namespace Readers
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        private static string DefaultLabel(SdrfDocument document) =>
-            string.IsNullOrEmpty(document.FilePath)
-                ? "(in memory)"
-                : Path.GetFileName(document.FilePath).Replace(".sdrf.tsv", "", StringComparison.OrdinalIgnoreCase);
+        /// <summary>
+        /// A label that stays unique across documents.
+        ///
+        /// Deliberately NOT the bare file name. Every search writes its SDRF into its own output
+        /// folder, so N re-searches of one experiment produce N files with the SAME base name in
+        /// different directories -- labels collided, and Merge then attributed every row to
+        /// whichever document was seen last. That is exactly the path-implied identity the
+        /// experiment-in-a-column design exists to avoid, so the fallback keeps enough of the path
+        /// to stay distinguishable.
+        /// </summary>
+        private static string DefaultLabel(SdrfDocument document)
+        {
+            if (string.IsNullOrEmpty(document.FilePath))
+                return "(in memory)";
+
+            string stem = Path.GetFileName(document.FilePath);
+            string extension = SupportedFileType.Sdrf.GetFileExtension();
+            if (stem.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                stem = stem.Substring(0, stem.Length - extension.Length);
+
+            // Qualify with the containing folder, which is what distinguishes one search's output
+            // from another's. Callers that have a better identity should pass explicit labels.
+            string? folder = Path.GetFileName(Path.GetDirectoryName(document.FilePath));
+            return string.IsNullOrEmpty(folder) ? stem : $"{folder}/{stem}";
+        }
 
         /// <summary>
         /// SDRF's block order: sample metadata, then data-file metadata, then factor values.

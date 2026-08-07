@@ -168,40 +168,69 @@ namespace Readers
         /// </summary>
         private static void ValidateColumnOrdering(SdrfHeader header, List<SdrfValidationMessage> messages)
         {
-            int firstComment = -1, lastCharacteristic = -1, firstFactor = -1, lastNonFactor = -1;
+            // Rewritten: the original compared only two pairs of extremes (last characteristic vs
+            // first comment, last non-factor vs first factor) and consequently fired ZERO times
+            // across all 1,236 curated files while missing the violation its own summary describes.
+            // ["source name","assay name","technology type","characteristics[organism]",
+            //  "comment[data file]"] has sample metadata after data-file metadata and produced no
+            // message, because lastCharacteristic(3) > firstComment(4) is false. It also never
+            // checked the position of source name, assay name or technology type at all.
+            //
+            // Instead: give every column its block rank and require the sequence to be
+            // non-decreasing. That detects every out-of-place column, including a leading
+            // characteristics[...] before source name.
+            int previousRank = int.MinValue;
+            int previousIndex = -1;
 
             for (int i = 0; i < header.Count; i++)
             {
                 string name = header[i];
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
-                if (name.StartsWith("characteristics[", StringComparison.Ordinal))
-                    lastCharacteristic = i;
-                else if (name.StartsWith("comment[", StringComparison.Ordinal) && firstComment < 0)
-                    firstComment = i;
+                int? maybeRank = BlockRank(name);
+                if (maybeRank is null)
+                    continue; // unrecognised column: the specification gives it no position
 
-                if (name.StartsWith("factor value[", StringComparison.Ordinal))
+                int rank = maybeRank.Value;
+                if (rank < previousRank)
                 {
-                    if (firstFactor < 0) firstFactor = i;
+                    messages.Add(new SdrfValidationMessage(
+                        SdrfValidationSeverity.Warning, "ColumnOrdering",
+                        $"'{name}' (column {i}) appears after '{header[previousIndex]}' (column " +
+                        $"{previousIndex}). The specification orders columns as source name, then " +
+                        "characteristics[...], then assay name and technology type, then comment[...], " +
+                        "then factor value[...].", null, name));
+                    // Do not reset: one message per out-of-place column, not one per pair.
                 }
                 else
                 {
-                    lastNonFactor = i;
+                    previousRank = rank;
+                    previousIndex = i;
                 }
             }
+        }
 
-            if (firstComment >= 0 && lastCharacteristic > firstComment)
-                messages.Add(new SdrfValidationMessage(
-                    SdrfValidationSeverity.Warning, "ColumnOrdering",
-                    $"'{header[lastCharacteristic]}' (column {lastCharacteristic}) appears after the first " +
-                    $"comment[...] column (column {firstComment}). Sample metadata should precede data-file " +
-                    "metadata."));
+        /// <summary>
+        /// The specification's block order. Compared case-INSENSITIVELY on purpose: the corpus
+        /// contains "Factor Value[organism part]", and an ordinal test silently disarmed the whole
+        /// rule on those files while a mixed-case pair elsewhere produced a false positive. Casing
+        /// is reported separately by ColumnNameCase, which is where it belongs.
+        /// </summary>
+        private static int? BlockRank(string columnName)
+        {
+            if (string.Equals(columnName, "source name", StringComparison.OrdinalIgnoreCase)) return 0;
+            if (columnName.StartsWith("characteristics[", StringComparison.OrdinalIgnoreCase)) return 1;
+            if (string.Equals(columnName, "assay name", StringComparison.OrdinalIgnoreCase)) return 2;
+            if (string.Equals(columnName, "technology type", StringComparison.OrdinalIgnoreCase)) return 3;
+            if (columnName.StartsWith("comment[", StringComparison.OrdinalIgnoreCase)) return 4;
+            if (columnName.StartsWith("factor value[", StringComparison.OrdinalIgnoreCase)) return 5;
 
-            if (firstFactor >= 0 && lastNonFactor > firstFactor)
-                messages.Add(new SdrfValidationMessage(
-                    SdrfValidationSeverity.Warning, "ColumnOrdering",
-                    $"'{header[lastNonFactor]}' (column {lastNonFactor}) appears after the first " +
-                    $"factor value[...] column (column {firstFactor}). Factor values should come last."));
+            // Null, NOT a rank after the comment block. Ranking unknowns forced legitimate
+            // sample-section columns to the end and produced a false positive on 28 curated files:
+            // "material type" is a real MAGE-TAB sample column, so every file writing it before
+            // "assay name" was reported out of order. Skipping unknowns takes the rule from 31
+            // flagged files (28 of them wrong) to 3, all genuine.
+            return null;
         }
 
         private static void ValidateRows(SdrfHeader header, IReadOnlyList<SdrfRow> rows,
@@ -287,10 +316,22 @@ namespace Readers
             if (!header.Contains("source name") || !header.Contains("assay name"))
                 return; // already reported as a missing required column
 
+            // A short row cannot be keyed. SdrfRow's indexer returns null both when a column is
+            // absent and when the row is too short to reach it, so two rows that both fall short of
+            // assay name collapsed onto the same "" key and were reported as duplicates of each
+            // other -- a second, wrong diagnosis on top of the RowWidth error they already had.
+            int keyReach = new[] { "source name", "assay name", "comment[label]" }
+                .Select(header.IndexOf)
+                .Where(i => i >= 0)
+                .DefaultIfEmpty(-1)
+                .Max();
+
             var seen = new Dictionary<string, int>(StringComparer.Ordinal);
             for (int r = 0; r < rows.Count; r++)
             {
                 var row = rows[r];
+                if (row.Cells.Count <= keyReach)
+                    continue;
                 // Tab is a safe key separator: cells come from splitting on tab, so no cell can
                 // contain one and the composite key cannot collide by accident.
                 string key = string.Join('\t', new[]
