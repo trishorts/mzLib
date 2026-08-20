@@ -30,7 +30,7 @@
 # ----------------------------------------------------------------------------					
 # Name	Motif	Specificity	PSI-MS Accession	PSI-MS Name	Cleavage Modification
 # MyCustomProtease	K|,R|	full			
-# MyTrypsinNoProline	K|,R|	full	MS:1001313	Trypsin	
+# MyTrypsinNoProline	K|,R|	full	MS:1001313	Trypsin/P	
 # ----------------------------------------------------------------------------					
 # Both lines add new proteases. The second is a trypsin-like variant without proline restriction.					
 # (Note: The built-in trypsin already carries the proline restriction via the [P] in its motif,					
@@ -58,6 +58,33 @@
 # proline restriction. Saved settings that meant the unrestricted enzyme must					
 # say trypsin/P.					
 #					
+# ============================================================================					
+# PSI-MS ACCESSIONS					
+# ============================================================================					
+# Columns 4 and 5 name a term in the PSI-MS controlled vocabulary (psi-ms.obo,					
+# embedded in UsefulProteomicsDatabases). They are what MetaMorpheus's mzIdentML					
+# writer puts in <EnzymeName>, and what an SDRF file's					
+# comment[cleavage agent details] resolves to.					
+#					
+# BLANK MEANS PSI-MS HAS NO TERM FOR THIS AGENT, and blank is then the correct					
+# entry -- both writers emit the name alone, which their specifications permit.					
+# Do NOT fill a blank with the nearest-looking term. An accession that resolves					
+# to a different agent is worse than none, because a consumer cannot tell it is					
+# wrong; three of the accessions in this file were that, undetected, for months.					
+#					
+# VERIFY AGAINST has_regexp, NOT AGAINST THE NAME. Every cleavage agent term in					
+# psi-ms.obo carries the regular expression it cleaves by, and that is what the					
+# Motif column has to agree with:					
+#					
+#   MS:1001251  Trypsin      (?<=[KR])(?!P)  = trypsin    K[P]|,R[P]|					
+#   MS:1001313  Trypsin/P    (?<=[KR])       = trypsin/P  K|,R|					
+#					
+# Under the /P convention above the row name and the PSI-MS name now coincide					
+# for most rows. That is a convenience, not a check: MS:1001312 reads as a					
+# perfectly ordinary accession and is TrypChymo, not Subtilisin.					
+#					
+# TestProteaseAccessions pins every non-blank accession against the embedded					
+# vocabulary, name included, and pins the blanks as deliberate.					
 # ============================================================================					
 # MOTIF SYNTAX GUIDE					
 # ============================================================================					
@@ -124,21 +151,21 @@ Asp-N	|D	full	MS:1001304	Asp-N
 chymotrypsin	F[P]|,W[P]|,Y[P]|,L[P]|	full	MS:1001306	Chymotrypsin	
 CNBr	M|	full	MS:1001307	CNBr	Homoserine lactone on M
 elastase	I[P]|,S[P]|,L[P]|,V[P]|,N[P]|,T[P]|,K[P]|,A[P]|,G[P]|,Y[P]|,Q[P]|,R[P]|,F[P]|,D[P]|	full		Elastase	
-Glu-C	E|	full			
-Glu-C (with asp)	E|,D|	full			
+Glu-C	E|	full	MS:1001315	V8-E	
+Glu-C (with asp)	E|,D|	full	MS:1001314	V8-DE	
 Lys-C	K[P]|	full	MS:1001309	Lys-C	
-Lys-N	|K	full			
-trypsin	K[P]|,R[P]|	full	MS:1001313	Trypsin	
-trypsin/P	K|,R|	full	MS:1001313	Trypsin	
+Lys-N	|K	full	MS:1003093	Lys-N	
+trypsin	K[P]|,R[P]|	full	MS:1001251	Trypsin	
+trypsin/P	K|,R|	full	MS:1001313	Trypsin/P	
 tryptophan oxidation	W|	full			
 non-specific	X|	full	MS:1001956	unspecific cleavage	
 top-down		none	MS:1001955	no cleavage	
-singleN		SingleN	MS:1001957	single cleavage	
-singleC		SingleC	MS:1001958	single cleavage	
-peptidomics		none		no cleavage	
+singleN		SingleN		single cleavage	
+singleC		SingleC		single cleavage	
+peptidomics		none	MS:1001955	no cleavage	
 collagenase	GPX|GPX	full			
 StcE-trypsin	TX|T,TX|S,SX|T,SX|S,K|,R|	full		StcE/Trypsin	
 CNBr_old	M|	full	MS:1001307	CNBr	
 CNBr_N	|M	full	MS:1001307	CNBr	Test on M
 ProAlanase	P|,A|	full			
-subtilisin	N[P]|,S[P]|,L[P]|,K[P]|,I[P]|,D[P]|,Y[P]|,V[P]|,G[P]|,F[P]|,T[P]|,E[P]|,Q[P]|,A[P]|,R[P]|	full	MS:1001312	Subtilisin
+subtilisin	N[P]|,S[P]|,L[P]|,K[P]|,I[P]|,D[P]|,Y[P]|,V[P]|,G[P]|,F[P]|,T[P]|,E[P]|,Q[P]|,A[P]|,R[P]|	full		Subtilisin
