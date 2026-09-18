@@ -190,7 +190,7 @@ namespace Proteomics.ProteolyticDigestion
         ///     Trypsin cannot cleave after an acylated lysine, so this peptidoform -- typically reported
         ///     with zero missed cleavages -- describes an event that does not occur. Drop it.
         /// (2) The peptidoform only exists because of the generation slack that
-        ///     <see cref="ProteinDigestion"/> adds when this flag is on, and -- once blocked sites are
+        ///     <c>Protein.Digest</c> adds when this flag is on, and -- once blocked sites are
         ///     discounted -- still has more OPEN missed cleavages than the caller allowed. A blocked
         ///     internal residue is not a cleavage site for this peptidoform, so it must not be counted
         ///     as a missed cleavage -- which is exactly what lets the read-through form of a blocked

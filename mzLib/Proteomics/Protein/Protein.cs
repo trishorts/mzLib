@@ -377,11 +377,9 @@ namespace Proteomics
             variableModifications = variableModifications ?? new List<Modification>();
             CleavageSpecificity searchModeType = digestionParameters.SearchModeType;
 
-            ProteinDigestion digestion = new(digestionParameters, allKnownFixedModifications, variableModifications);
-
             // SearchModeType Semi means two different things depending on FragmentationTerminus:
             //  - N or C: the caller is MetaMorpheus's non-specific search engine, which wants "seed" peptides fixed at that
-            //    terminus and trims them after the search (see ProteinDigestion.SpeedySemiSpecificDigestion).
+            //    terminus and trims them after the search.
             //  - anything else (Both is the default): the caller wants the semi-specific peptides themselves. Classic,
             //    Modern, Glyco and crosslink searches do no trimming, so they must get every peptide with at least one
             //    specific terminus. This used to fall through to the seed path as well, where Both silently behaved as C,
@@ -390,10 +388,51 @@ namespace Proteomics
             // singleC, whose digestion (the first branch) returns non-specific seeds; None + Both gives the singleC ones.
             // The full table of what each SearchModeType and FragmentationTerminus returns is on
             // DigestionParams.SearchModeType and is pinned by SearchModeTypeDigestionTests.
-            IEnumerable<ProteolyticPeptide> unmodifiedPeptides =
-                searchModeType != CleavageSpecificity.Semi ? digestion.Digestion(this, topDownTruncationSearch)
-                : ProteinDigestion.WantsSemiSpecificSeeds(digestionParameters) ? digestion.SpeedySemiSpecificDigestion(this)
-                : digestion.SemiSpecificDigestion(this);
+            // Modification-aware digestion, hoisted here when ProteinDigestion was dissolved into Protease.
+            // Every modification this digestion could place: the variable list and the fixed list together.
+            // Materialised once, because the feasibility filter walks it per candidate site.
+            List<Modification> configuredModifications = variableModifications.Concat(allKnownFixedModifications).ToList();
+
+            // BLOCKING: a modification can remove a site the sequence really has, so the read-through peptide
+            // spanning it is LONGER and must be bought with generation slack (one extra missed cleavage per
+            // blocked site, bounded by MaxMods since a peptidoform carries at most that many variable mods).
+            // The surplus is trimmed again by the open-site filter in ProteolyticPeptide.GetModifiedPeptides.
+            // The slack is bought with enumeration, so it is granted only when it can be spent: a search whose
+            // configured modifications cannot block a cleavage of THIS protease pays nothing.
+            int generationMaxMissedCleavages = digestionParameters.MaxMissedCleavages;
+            if (digestionParameters.RespectCleavageBlockingModifications
+                && searchModeType == CleavageSpecificity.Full
+                && configuredModifications.Any(m => CleavageBlockingModifications.BlocksCleavageBy(m, digestionParameters.Protease)))
+            {
+                generationMaxMissedCleavages += digestionParameters.MaxMods;
+            }
+
+            // PROMOTING: the mirror, needing the opposite treatment. Promoting removes a site the sequence never
+            // really had, so the replacement is just the ordinary peptide between the sites that remain. The
+            // feasibility filter inside FullDigestion does that, which is why this is a flag and not a budget.
+            //
+            // There is deliberately NO "can anything satisfy the requirement" gate here, and the absence is
+            // load-bearing. It looks like the natural mirror of the blocking gate above, but the two are not
+            // symmetric: a blocking modification that is not configured cannot remove a site the sequence really
+            // has, whereas a promoting requirement that nothing can satisfy means the protease genuinely has no
+            // site to cut. Adding the gate makes a glycoprotease digest a bare protein, which is exactly what the
+            // published unglycosylated controls say does not happen (truth-set STCE-03, IMPA-12, OGPA-07).
+            bool respectCleavageRequirements = digestionParameters.RespectCleavagePromotingModifications
+                && searchModeType == CleavageSpecificity.Full
+                && digestionParameters.Protease.HasCleavageRequirement;
+
+            IEnumerable<ProteolyticPeptide> unmodifiedPeptides = digestionParameters.Protease.GetUnmodifiedPeptides(
+                this,
+                generationMaxMissedCleavages,
+                digestionParameters.InitiatorMethionineBehavior,
+                digestionParameters.MinLength,
+                digestionParameters.MaxLength,
+                digestionParameters.SpecificProtease,
+                digestionParameters.FragmentationTerminus,
+                digestionParameters.SearchModeType,
+                topDownTruncationSearch,
+                respectCleavageRequirements,
+                configuredModifications);
 
             if (digestionParameters.KeepNGlycopeptide || digestionParameters.KeepOGlycopeptide)
             {

@@ -483,8 +483,10 @@ namespace Test.ProteomicsTests.ProteolyticDigestion
             {
                 var dp = new DigestionParams(protease: "trypsin", maxMissedCleavages: 2, minPeptideLength: 5,
                     respectCleavageBlockingModifications: respect);
-                return new ProteinDigestion(dp, new List<Modification>(), variableMods.ToList())
-                    .Digestion(protein).Count();
+                // ProteinDigestion was dissolved into Protease by mzLib #1318; Protein.Digest is now the
+                // single production digestion path. Slack widens the UNMODIFIED enumeration, which widens
+                // the peptidoforms built from it, so the gate is still observable from here.
+                return protein.Digest(dp, new List<Modification>(), variableMods.ToList()).Count();
             }
 
             int baseline = Enumerated(respect: false, phospho, methyl);
