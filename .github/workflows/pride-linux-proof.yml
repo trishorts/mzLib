@@ -1,0 +1,25 @@
+name: PRIDE Linux proof
+
+# Scratch workflow on the trishorts fork, not for merge. Answers aging REQ-PRIDE-3: does the PRIDE
+# client behave on Linux? Runs the PRIDE offline tests, then the live PRIDE canaries.
+on:
+  push:
+    branches: [ scratch/pride-linux-proof ]
+  workflow_dispatch:
+
+jobs:
+  pride-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Build
+      run: dotnet build mzLib/PrideLinuxProof/PrideLinuxProof.csproj
+    - name: Test (offline)
+      run: dotnet test mzLib/PrideLinuxProof/PrideLinuxProof.csproj --no-build --settings mzLib/Test/required.runsettings --logger "console;verbosity=normal"
+    - name: Test (live PRIDE)
+      if: always()
+      run: dotnet test mzLib/PrideLinuxProof/PrideLinuxProof.csproj --no-build --logger "console;verbosity=detailed" -- NUnit.Where="cat == ExternalService"

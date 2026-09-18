@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Scratch harness, not for merge: runs the PRIDE client tests on Linux. Test/Test.csproj targets
+       net10.0-windows (it references the WPF mzPlot), so it cannot run there. This project compiles
+       the same PRIDE test files, unmodified, against plain net10.0. AssemblyName "Test" keeps the
+       InternalsVisibleTo grants the tests rely on. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Test</AssemblyName>
+    <RootNamespace>Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Test/ExternalServiceTestHelper.cs" Link="ExternalServiceTestHelper.cs" />
+    <Compile Include="../Test/DatabaseTests/Pride*.cs" LinkBase="DatabaseTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="4.1.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../UsefulProteomicsDatabases/UsefulProteomicsDatabases.csproj" />
+  </ItemGroup>
+
+</Project>
