@@ -1,0 +1,32 @@
+name: pepxml-linux-proof (scratch, not for merge)
+on:
+  push:
+    branches: [scratch/pepxml-linux-proof]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: master
+            ref: dd68b6da87771059c24fd82d144237ae364ed005
+          - label: fix
+            ref: a2087471655129518b8cfa052123bf861b935ec2
+    name: build Proteomics at ${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build Proteomics.csproj
+        run: dotnet build mzLib/Proteomics/Proteomics.csproj -c Release 2>&1 | tee build.log
+      - name: Report
+        run: |
+          echo "== warnings naming the pepXML project =="
+          grep -i "pepxml" build.log | grep -i "warning" || echo "(none)"
+          echo "== PepXML assemblies in Proteomics output =="
+          find mzLib/Proteomics/bin -iname "*pepxml*.dll" || true
+          if find mzLib/Proteomics/bin -iname "PepXML.dll" | grep -q .; then echo "RESULT: PepXML.dll present"; else echo "RESULT: PepXML.dll MISSING"; fi
