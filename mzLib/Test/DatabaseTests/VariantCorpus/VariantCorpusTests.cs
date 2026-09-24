@@ -26,7 +26,8 @@ namespace Test.DatabaseTests.VariantCorpus
     /// protein start/end, VCF depth cutoff, multi-residue MNV, and double substitutions) and pulls the bottom-up
     /// DIGESTION axis forward for the "a substitution moves the knife" cases (installment 5): trypsin cut-site
     /// create/destroy and the not-before-proline rule (trypsin|P). The I-series adds anchored insertions (L1).
-    /// The P-series opens processing (L2): a chain boundary re-based by an applied variant.
+    /// The P-series opens processing (L2): a chain boundary re-based by an applied variant, and initiator-Met
+    /// removal decided on each variant-applied proteoform's own first residue.
     /// </summary>
     [TestFixture]
     internal class VariantCorpusTests
@@ -44,7 +45,8 @@ namespace Test.DatabaseTests.VariantCorpus
             int ExpectedCount, string Verdict, string Reason,
             string[] ExpectedForms,
             int MinAlleleDepth = 1, int MaxHeterozygous = 4,
-            string Opts = "-", string Processing = "-");
+            string Opts = "-", string Processing = "-",
+            InitiatorMethionineBehavior InitiatorMet = InitiatorMethionineBehavior.Retain);
 
         // Canonical test-mod registry (see README "Canonical test mods"). name -> (ModificationType, monoisotopicMass).
         private static readonly Dictionary<string, (string Type, double Mass)> ModRegistry = new()
@@ -674,6 +676,83 @@ namespace Test.DatabaseTests.VariantCorpus
                     "TIDE", "T[Biological:Phosphorylation on T]IDE"
                 },
                 Processing: "chain@4-7");
+
+            // ---- L2 processing: initiator Met x a variant at the N-terminus (invariant 8) ---------------------
+            // Initiator-Met removal is a processing step, so it runs in the variant-applied frame: each proteoform is
+            // cleaved iff ITS OWN residue 1 is M, whatever the consensus starts with. A start-loss variant (M1->X) is
+            // applied literally; re-initiation at a downstream Met is not modelled (settled 2026-09-24).
+
+            // P02 — start-loss under Cleave. Phospho@T5; M1->V. Consensus MPEPTIDE loses its Met -> PEPTIDE{0,1}; the
+            // variant VPEPTIDE has no Met to remove and stays whole -> VPEPTIDE{0,1}. The sub is at 1, so T5 keeps
+            // its phospho on both. 4 forms.
+            yield return new CorpusCase(
+                Id: "P02", Layer: "L2-proc", Tests: "initmet-cleave-start-loss",
+                Base: "MPEPTIDE", Mods: "Phosphorylation@5", Variants: "OP=M VAR=V POS=1 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 4, Verdict: "applied",
+                Reason: "M1->V removes the initiator Met, so Cleave has nothing to take from the variant: consensus -> PEPTIDE{0,1}, variant -> VPEPTIDE{0,1}. Met removal is decided on the applied proteoform's own residue 1 (invariant 8); start-loss is applied literally.",
+                ExpectedForms: new[]
+                {
+                    "PEPTIDE", "PEPT[Biological:Phosphorylation on T]IDE",
+                    "VPEPTIDE", "VPEPT[Biological:Phosphorylation on T]IDE"
+                },
+                InitiatorMet: InitiatorMethionineBehavior.Cleave);
+
+            // P03 — a variant that CREATES an initiator Met, under Cleave. Phospho@T5; V1->M. The consensus VPEPTIDE
+            // has no Met and stays whole; the variant MPEPTIDE starts with M and loses it -> PEPTIDE{0,1}. Reverse of
+            // P02. 4 forms.
+            yield return new CorpusCase(
+                Id: "P03", Layer: "L2-proc", Tests: "initmet-cleave-created-by-variant",
+                Base: "VPEPTIDE", Mods: "Phosphorylation@5", Variants: "OP=V VAR=M POS=1 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 4, Verdict: "applied",
+                Reason: "V1->M gives the variant an initiator Met that the consensus lacks; Cleave removes it from the variant only: consensus -> VPEPTIDE{0,1}, variant -> PEPTIDE{0,1}. Reverse of P02 (invariant 8).",
+                ExpectedForms: new[]
+                {
+                    "VPEPTIDE", "VPEPT[Biological:Phosphorylation on T]IDE",
+                    "PEPTIDE", "PEPT[Biological:Phosphorylation on T]IDE"
+                },
+                InitiatorMet: InitiatorMethionineBehavior.Cleave);
+
+            // P04 — insertion anchored on the initiator Met (left anchor), under Cleave. Phospho@T5; M1->MAG keeps M
+            // at residue 1 and inserts AG after it, so the variant MAGPEPTIDE still loses its Met -> AGPEPTIDE, with T
+            // (and its phospho) at 7 of the variant. Consensus -> PEPTIDE{0,1}. 4 forms.
+            yield return new CorpusCase(
+                Id: "P04", Layer: "L2-proc", Tests: "initmet-cleave-ins-after-met",
+                Base: "MPEPTIDE", Mods: "Phosphorylation@5", Variants: "OP=M VAR=MAG POS=1 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 4, Verdict: "applied",
+                Reason: "M1->MAG keeps M as residue 1 of the variant, so Cleave still removes it: variant -> AGPEPTIDE{0,1} (phospho T5 -> 7 of MAGPEPTIDE), consensus -> PEPTIDE{0,1}. The kept anchor is the Met itself (I01 rule).",
+                ExpectedForms: new[]
+                {
+                    "PEPTIDE", "PEPT[Biological:Phosphorylation on T]IDE",
+                    "AGPEPTIDE", "AGPEPT[Biological:Phosphorylation on T]IDE"
+                },
+                InitiatorMet: InitiatorMethionineBehavior.Cleave);
+
+            // P05 — insertion ahead of the initiator Met (right anchor), under Cleave. M1->AGM keeps the M but moves it
+            // to residue 3, so the variant AGMPEPTIDE starts with A and nothing is removed. Consensus -> PEPTIDE. No
+            // mod, 2 forms. Mirror of P04: the M survives but is no longer the N-terminus.
+            yield return new CorpusCase(
+                Id: "P05", Layer: "L2-proc", Tests: "initmet-cleave-ins-before-met",
+                Base: "MPEPTIDE", Mods: "-", Variants: "OP=M VAR=AGM POS=1 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 2, Verdict: "applied",
+                Reason: "M1->AGM puts AG in front of the Met, so the variant's residue 1 is A and Cleave leaves AGMPEPTIDE whole; consensus -> PEPTIDE. An internal M is not an initiator Met (invariant 8).",
+                ExpectedForms: new[] { "PEPTIDE", "AGMPEPTIDE" },
+                InitiatorMet: InitiatorMethionineBehavior.Cleave);
+
+            // P06 — start-loss under Variable. M1->V. Variable yields both the Met-retained and the Met-removed form
+            // for a proteoform that starts with M, and only the whole form for one that does not: consensus ->
+            // MPEPTIDE + PEPTIDE, variant -> VPEPTIDE. No mod, 3 forms.
+            yield return new CorpusCase(
+                Id: "P06", Layer: "L2-proc", Tests: "initmet-variable-start-loss",
+                Base: "MPEPTIDE", Mods: "-", Variants: "OP=M VAR=V POS=1 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 3, Verdict: "applied",
+                Reason: "Variable emits Met-on and Met-off forms only for a proteoform whose own residue 1 is M: consensus -> MPEPTIDE + PEPTIDE, variant VPEPTIDE -> itself. 3 forms (invariant 8).",
+                ExpectedForms: new[] { "MPEPTIDE", "PEPTIDE", "VPEPTIDE" },
+                InitiatorMet: InitiatorMethionineBehavior.Variable);
         }
 
         private static IEnumerable<TestCaseData> Cases()
@@ -812,7 +891,7 @@ namespace Test.DatabaseTests.VariantCorpus
         {
             var dp = new DigestionParams(protease: c.Protease, maxMissedCleavages: 0, minPeptideLength: 1,
                 maxModificationIsoforms: c.MaxIsoforms, maxModsForPeptides: c.MaxMods,
-                initiatorMethionineBehavior: InitiatorMethionineBehavior.Retain);
+                initiatorMethionineBehavior: c.InitiatorMet);
 
             return proteins
                 .SelectMany(p => p.Digest(dp, new List<Modification>(), new List<Modification>()))
