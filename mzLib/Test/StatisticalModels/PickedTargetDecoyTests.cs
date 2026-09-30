@@ -152,6 +152,20 @@ public class PickedTargetDecoyTests
         Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete(["A"], [1.0], [true, false]));
         Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete([null!], [1.0], [true]));
         Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete(["A"], [double.PositiveInfinity], [true]));
+        Assert.Throws<ArgumentNullException>(() => PickedTargetDecoy.Compete(["A"], null!, [true]));
+        Assert.Throws<ArgumentNullException>(() => PickedTargetDecoy.Compete(["A"], [1.0], null!));
+        Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete(["A", "B"], [1.0], [true, false]), "only the scores are short");
+        Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete(["A", null!], [1.0, 2.0], [true, false]), "one null key among several");
+        Assert.Throws<ArgumentException>(() => PickedTargetDecoy.Compete(["A", "B"], [1.0, double.NaN], [true, false]), "one non-finite score among several");
+    }
+
+    /// <summary>Two targets tied under one key: the earlier input competes, so the choice is reproducible.</summary>
+    [Test]
+    public void TiedEntriesOfOneClassUnderAKeyKeepTheEarlierInput()
+    {
+        var result = PickedTargetDecoy.Compete(["X", "X", "X"], [5, 5, 1], [false, false, true]);
+
+        Assert.That(result.Kept, Is.EqualTo(new[] { true, false, false }));
     }
 
     #endregion
