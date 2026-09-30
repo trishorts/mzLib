@@ -23,6 +23,20 @@ namespace StatisticalModels
         FoldStarved,
     }
 
+    /// <summary>The model the rescorer fits within each fold.</summary>
+    public enum RescoreModel
+    {
+        /// <summary>A ridge Fisher linear discriminant (<see cref="LinearDiscriminant"/>), refit each iteration.</summary>
+        LinearDiscriminant,
+
+        /// <summary>
+        /// The linear iterations choose the training rows, then an averaged ensemble of small tanh networks
+        /// (<see cref="MultilayerPerceptron"/>) is trained on them, all targets against all decoys (as DIA-NN does), and scores
+        /// by the logit of its mean probability.
+        /// </summary>
+        NeuralNetworkEnsemble,
+    }
+
     /// <summary>The combined score of each candidate, the fold that scored it, and how the rescoring ended.</summary>
     public sealed class RescoreResult
     {
@@ -62,7 +76,8 @@ namespace StatisticalModels
         /// <exception cref="ArgumentException">Lengths disagree, rows are ragged, or a value is not finite.</exception>
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
-            int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null)
+            int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
+            RescoreModel model = RescoreModel.LinearDiscriminant)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -130,6 +145,14 @@ namespace StatisticalModels
                 if (!trained)
                     status = RescoreStatus.FoldStarved;
 
+                if (model == RescoreModel.NeuralNetworkEnsemble && trained)
+                {
+                    int[] rows = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                    var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
+                        NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f);
+                    scorer = x => Logit(ensemble.Predict(x));
+                }
+
                 // Normalize on the training rows so that folds are comparable when pooled
                 int[] finalActive = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
                 double[] finalTrain = finalActive.Select(i => scorer(features[i])).ToArray();
@@ -156,6 +179,16 @@ namespace StatisticalModels
                 .Select((key, index) => (key, index))
                 .ToDictionary(g => g.key, g => g.index % folds, StringComparer.Ordinal);
             return groupKeys.Select(key => foldOfGroup[key]).ToArray();
+        }
+
+        private const int NetworkMembers = 5;
+        private const int NetworkEpochs = 10;
+        private static readonly int[] NetworkLayers = [25, 20, 15, 10, 5]; // DIA-NN 2020's architecture
+
+        private static double Logit(double p)
+        {
+            double clamped = Math.Clamp(p, 1e-12, 1 - 1e-12);
+            return Math.Log(clamped / (1 - clamped));
         }
 
         /// <summary>Fewer training positives than this and the training cutoff is relaxed.</summary>

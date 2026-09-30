@@ -320,6 +320,48 @@ public class TargetDecoyRescorerTests
         Assert.Throws<ArgumentException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, candidateGroups: new int[3]));
     }
 
+    /// <summary>
+    /// True targets that differ from decoys only non-linearly (a larger spread on two features, the same mean): the network
+    /// ensemble finds them, a line cannot. It trains only on each fold's training rows.
+    /// </summary>
+    [Test]
+    public void TheNetworkModelFindsNonLinearSignalTheLineMisses()
+    {
+        var random = new Random(21);
+        var features = new List<double[]>();
+        var isDecoy = new List<bool>();
+        var groups = new List<string>();
+        void Add(bool decoy, bool real, int i)
+        {
+            double spread = real ? 3.0 : 1.0;
+            features.Add([spread * Gaussian(random), spread * Gaussian(random), Gaussian(random)]);
+            isDecoy.Add(decoy);
+            groups.Add($"{(decoy ? "D" : "T")}{i}");
+        }
+        for (int i = 0; i < 2000; i++) Add(false, true, i);
+        for (int i = 0; i < 2000; i++) Add(false, false, 2000 + i);
+        for (int i = 0; i < 4000; i++) Add(true, false, i);
+        bool[] decoys = isDecoy.ToArray();
+
+        var linear = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15);
+        var network = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+
+        int atOnePercentLinear = TargetsAtQ(linear.Scores, decoys, 0.01);
+        int atOnePercentNetwork = TargetsAtQ(network.Scores, decoys, 0.01);
+        Assert.That(atOnePercentNetwork, Is.GreaterThan(atOnePercentLinear + 200), $"network {atOnePercentNetwork} vs line {atOnePercentLinear}");
+    }
+
+    /// <summary>The network model must not manufacture discoveries: with nothing real, about 1% at most, as for the line.</summary>
+    [Test]
+    public void TheNetworkModelFindsNothingWhereThereIsNothing()
+    {
+        var (features, isDecoy, groups, _) = Candidates(0, 3000, 3000, shift: 0, seed: 9);
+
+        var result = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+
+        Assert.That(TargetsAtQ(result.Scores, isDecoy, 0.01), Is.LessThanOrEqualTo(30));
+    }
+
     [Test]
     public void RescorerArgumentsAreChecked()
     {
