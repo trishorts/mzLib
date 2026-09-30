@@ -132,6 +132,59 @@ public class TestFragmentCoElutionBestFragment
         Assert.Throws<ArgumentException>(() => FragmentCoElution.ApexScores(traces, [1.0], 3));
     }
 
+    /// <summary>Candidates from precomputed apex scores are the candidates from the traces, so a caller scores each scan once.</summary>
+    [Test]
+    public void CandidatesFromPrecomputedScoresMatchCandidatesFromTraces()
+    {
+        double[] library = [1.0, 0.6, 0.3];
+        var traces = library.Select(l => Enumerable.Range(0, 41)
+            .Select(s => l * (1000 * Math.Exp(-0.5 * Math.Pow((s - 30) / 2.0, 2)) + 200 * Math.Exp(-0.5 * Math.Pow((s - 10) / 2.0, 2)))).ToArray()).ToList();
+
+        double[] scores = FragmentCoElution.ApexScores(traces, library, 3);
+
+        Assert.That(FragmentCoElution.FindApexes(scores, 3, 5), Is.EqualTo(FragmentCoElution.FindApexes(traces, library, 3, 5)));
+        Assert.That(FragmentCoElution.FindApexes(new double[10], 3, 5), Is.Empty);
+        Assert.Throws<ArgumentOutOfRangeException>(() => FragmentCoElution.FindApexes(scores, -1, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => FragmentCoElution.FindApexes(scores, 3, 0));
+        Assert.Throws<ArgumentNullException>(() => FragmentCoElution.FindApexes(null!, 3, 5));
+    }
+
+    /// <summary>
+    /// The 9-point Savitzky–Golay filter (quadratic/cubic; weights −21, 14, 39, 54, 59, 54, 39, 14, −21 over 231, as in
+    /// EncyclopeDIA and Skyline) reproduces any cubic exactly away from the ends, where four neighbours exist on each side.
+    /// </summary>
+    [Test]
+    public void SavitzkyGolayReproducesACubicAwayFromTheEnds()
+    {
+        double[] cubic = Enumerable.Range(0, 20).Select(s => 50 + 3.0 * s + 0.5 * s * s - 0.02 * s * s * s).ToArray();
+
+        double[] smoothed = FragmentCoElution.SavitzkyGolay9(cubic);
+
+        for (int s = 4; s < 16; s++)
+            Assert.That(smoothed[s], Is.EqualTo(cubic[s]).Within(1e-9), $"scan {s}");
+    }
+
+    /// <summary>
+    /// The ends, which lack four neighbours on one side, are left as they are. Negative ringing next to a sharp spike is
+    /// clipped to 0, since intensities cannot be negative.
+    /// </summary>
+    [Test]
+    public void SavitzkyGolayLeavesTheEndsAndClipsNegatives()
+    {
+        double[] spike = new double[21];
+        spike[10] = 231;
+
+        double[] smoothed = FragmentCoElution.SavitzkyGolay9(spike);
+
+        Assert.That(smoothed[10], Is.EqualTo(59).Within(1e-9));
+        Assert.That(smoothed[9], Is.EqualTo(54).Within(1e-9));
+        Assert.That(smoothed[6], Is.EqualTo(0), "4 scans from the spike the -21 weight would give -21; clipped");
+        Assert.That(smoothed[14], Is.EqualTo(0));
+        double[] ends = [5, 6, 7, 8, 9, 10];
+        Assert.That(FragmentCoElution.SavitzkyGolay9(ends), Is.EqualTo(ends), "too short to smooth: unchanged");
+        Assert.Throws<ArgumentNullException>(() => FragmentCoElution.SavitzkyGolay9(null!));
+    }
+
     [Test]
     public void ArgumentsAreChecked()
     {

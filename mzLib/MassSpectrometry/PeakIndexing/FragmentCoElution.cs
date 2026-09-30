@@ -39,6 +39,29 @@ namespace MassSpectrometry
             return smoothed;
         }
 
+        private static readonly double[] SavitzkyGolay9Weights = [-21, 14, 39, 54, 59, 54, 39, 14, -21];
+
+        /// <summary>
+        /// Smooths a trace with the 9-point quadratic/cubic Savitzky–Golay filter (weights −21, 14, 39, 54, 59, 54, 39, 14, −21
+        /// over 231), as EncyclopeDIA and Skyline smooth fragment chromatograms before picking peaks. It keeps peak height and
+        /// width better than a moving average. Points within four scans of an end are left unchanged, and negative ringing
+        /// beside sharp spikes is clipped to 0.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="trace"/> is null.</exception>
+        public static double[] SavitzkyGolay9(IReadOnlyList<double> trace)
+        {
+            ArgumentNullException.ThrowIfNull(trace);
+            var smoothed = trace.ToArray();
+            for (int s = 4; s < trace.Count - 4; s++)
+            {
+                double sum = 0;
+                for (int w = 0; w < 9; w++)
+                    sum += SavitzkyGolay9Weights[w] * trace[s - 4 + w];
+                smoothed[s] = Math.Max(0, sum / 231);
+            }
+            return smoothed;
+        }
+
         /// <summary>
         /// The fragment whose trace, over scans <paramref name="from"/> to <paramref name="to"/>, has the largest summed
         /// Pearson correlation with the other fragments (negative or undefined correlations count as 0). Its smoothed
@@ -212,7 +235,22 @@ namespace MassSpectrometry
             ArgumentOutOfRangeException.ThrowIfNegative(halfWidth);
             ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
 
-            double[] values = ApexScores(traces, libraryIntensities.ToArray(), halfWidth, length);
+            return FindApexes(ApexScores(traces, libraryIntensities.ToArray(), halfWidth, length), halfWidth, maxCount);
+        }
+
+        /// <summary>
+        /// Candidate apexes from precomputed apex scores (<see cref="ApexScores(IReadOnlyList{double[]}, IReadOnlyList{double}, int)"/>),
+        /// so a caller that also needs the scores computes them once. Same rules as the overload on traces.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="apexScores"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="halfWidth"/> is negative or <paramref name="maxCount"/> is less than 1.</exception>
+        public static int[] FindApexes(IReadOnlyList<double> apexScores, int halfWidth, int maxCount)
+        {
+            ArgumentNullException.ThrowIfNull(apexScores);
+            ArgumentOutOfRangeException.ThrowIfNegative(halfWidth);
+            ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
+            double[] values = apexScores as double[] ?? apexScores.ToArray();
+            int length = values.Length;
             var chosen = new List<int>();
             foreach (int s in Enumerable.Range(0, length).Where(s => values[s] > 0 && IsLocalMaximum(values, s, halfWidth)).OrderByDescending(s => values[s]).ThenBy(s => s))
             {
