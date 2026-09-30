@@ -217,23 +217,7 @@ namespace StatisticalModels
             return sd > LinearDiscriminant.ConstantTolerance ? (targets.Average() - decoys.Average()) / sd : 0;
         }
 
-        /// <summary>Target-decoy q-values, (D + 1) / T and monotone, in input order. Decoys receive the value at their rank.</summary>
-        internal static double[] QValues(double[] scores, bool[] isDecoy)
-        {
-            int[] order = Enumerable.Range(0, scores.Length).OrderByDescending(i => scores[i]).ThenBy(i => i).ToArray();
-            var ranked = new double[order.Length];
-            int decoys = 0, targets = 0;
-            for (int k = 0; k < order.Length; k++)
-            {
-                if (isDecoy[order[k]]) decoys++; else targets++;
-                ranked[k] = targets == 0 ? 1 : Math.Min(1, (decoys + 1.0) / targets);
-            }
-            for (int k = order.Length - 2; k >= 0; k--)
-                ranked[k] = Math.Min(ranked[k], ranked[k + 1]);
-            var q = new double[scores.Length];
-            for (int k = 0; k < order.Length; k++)
-                q[order[k]] = ranked[k];
-            return q;
-        }
+        /// <summary>Target-decoy q-values in input order, from the shared <see cref="TargetDecoyQValues"/>.</summary>
+        internal static double[] QValues(double[] scores, bool[] isDecoy) => TargetDecoyQValues.Compute(scores, isDecoy);
     }
 }
