@@ -62,7 +62,7 @@ namespace StatisticalModels
         /// <exception cref="ArgumentException">Lengths disagree, rows are ragged, or a value is not finite.</exception>
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
-            int folds = 3, int iterations = 3, double positiveQValue = 0.01)
+            int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -71,6 +71,8 @@ namespace StatisticalModels
                 throw new ArgumentException($"There are {features.Count} candidates but {isDecoy.Count} decoy labels.", nameof(isDecoy));
             if (groupKeys.Count != features.Count)
                 throw new ArgumentException($"There are {features.Count} candidates but {groupKeys.Count} group keys.", nameof(groupKeys));
+            if (candidateGroups is not null && candidateGroups.Count != features.Count)
+                throw new ArgumentException($"There are {features.Count} candidates but {candidateGroups.Count} candidate groups.", nameof(candidateGroups));
             if (folds < 2)
                 throw new ArgumentOutOfRangeException(nameof(folds), folds, "There must be at least 2 folds.");
             if (iterations < 1)
@@ -98,22 +100,24 @@ namespace StatisticalModels
                 if (test.Length == 0)
                     continue;
 
-                var seed = BestSingleFeature(features, isDecoy, train, positiveQValue);
+                var seed = BestSingleFeature(features, isDecoy, train, positiveQValue, candidateGroups);
                 Func<double[], double> scorer = x => seed.Sign * x[seed.Feature];
                 bool trained = false;
                 for (int iteration = 0; iteration < iterations; iteration++)
                 {
-                    double[] trainScores = train.Select(i => scorer(features[i])).ToArray();
-                    double[] q = QValues(trainScores, train.Select(i => isDecoy[i]).ToArray());
-                    double cutoff = TrainingCutoff(q, train.Select(i => isDecoy[i]).ToArray(), positiveQValue);
+                    // Only each candidate group's top row under the current model trains it (pyProphet)
+                    int[] active = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                    double[] trainScores = active.Select(i => scorer(features[i])).ToArray();
+                    double[] q = QValues(trainScores, active.Select(i => isDecoy[i]).ToArray());
+                    double cutoff = TrainingCutoff(q, active.Select(i => isDecoy[i]).ToArray(), positiveQValue);
                     var rows = new List<double[]>();
                     var positive = new List<bool>();
-                    for (int t = 0; t < train.Length; t++)
+                    for (int t = 0; t < active.Length; t++)
                     {
-                        bool decoy = isDecoy[train[t]];
+                        bool decoy = isDecoy[active[t]];
                         if (decoy || q[t] <= cutoff)
                         {
-                            rows.Add(features[train[t]]);
+                            rows.Add(features[active[t]]);
                             positive.Add(!decoy);
                         }
                     }
@@ -127,8 +131,9 @@ namespace StatisticalModels
                     status = RescoreStatus.FoldStarved;
 
                 // Normalize on the training rows so that folds are comparable when pooled
-                double[] finalTrain = train.Select(i => scorer(features[i])).ToArray();
-                bool[] trainDecoy = train.Select(i => isDecoy[i]).ToArray();
+                int[] finalActive = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                double[] finalTrain = finalActive.Select(i => scorer(features[i])).ToArray();
+                bool[] trainDecoy = finalActive.Select(i => isDecoy[i]).ToArray();
                 double[] finalQ = QValues(finalTrain, trainDecoy);
                 double[] decoyScores = finalTrain.Where((_, t) => trainDecoy[t]).Order().ToArray();
                 double medianDecoy = decoyScores.Length == 0 ? 0 : decoyScores[decoyScores.Length / 2];
@@ -181,29 +186,43 @@ namespace StatisticalModels
         /// passes anywhere, go to the larger standardized target-minus-decoy mean difference. That difference always carries the
         /// right sign, so a direction is never chosen by the order the features happen to be in.
         /// </summary>
-        internal static (int Feature, int Sign) BestSingleFeature(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, int[] train, double cutoff)
+        internal static (int Feature, int Sign) BestSingleFeature(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, int[] train, double cutoff,
+            IReadOnlyList<int>? candidateGroups = null)
         {
-            bool[] decoy = train.Select(i => isDecoy[i]).ToArray();
             int p = features.Count == 0 ? 0 : features[0].Length;
-            var candidates = new List<(int Feature, int Sign, double Separation, double[] Q)>();
+            var candidates = new List<(int Feature, int Sign, double Separation, double[] Q, bool[] Decoy)>();
             for (int j = 0; j < p; j++)
             {
-                double[] values = train.Select(i => features[i][j]).ToArray();
-                double separation = StandardizedMeanDifference(values, decoy);
                 foreach (int sign in new[] { 1, -1 })
-                    candidates.Add((j, sign, sign * separation, QValues(values.Select(v => sign * v).ToArray(), decoy)));
+                {
+                    // With candidate groups, each feature and sign judges only the group rows it ranks top
+                    int[] rows = TopPerGroup(train, candidateGroups, i => sign * features[i][j]);
+                    bool[] rowDecoy = rows.Select(i => isDecoy[i]).ToArray();
+                    double[] values = rows.Select(i => features[i][j]).ToArray();
+                    double separation = StandardizedMeanDifference(values, rowDecoy);
+                    candidates.Add((j, sign, sign * separation, QValues(values.Select(v => sign * v).ToArray(), rowDecoy), rowDecoy));
+                }
             }
 
-            int Passing(double[] q, double c) => Enumerable.Range(0, q.Length).Count(t => !decoy[t] && q[t] <= c);
+            int PassingOf((int Feature, int Sign, double Separation, double[] Q, bool[] Decoy) k, double c) =>
+                Enumerable.Range(0, k.Q.Length).Count(t => !k.Decoy[t] && k.Q[t] <= c);
             double chosenCutoff = new[] { cutoff }.Concat(RelaxedCutoffs.Where(c => c > cutoff))
-                .FirstOrDefault(c => candidates.Any(k => Passing(k.Q, c) >= MinimumPositives), cutoff);
+                .FirstOrDefault(c => candidates.Any(k => PassingOf(k, c) >= MinimumPositives), cutoff);
             var best = candidates
-                .OrderByDescending(k => Passing(k.Q, chosenCutoff))
+                .OrderByDescending(k => PassingOf(k, chosenCutoff))
                 .ThenByDescending(k => k.Separation)
                 .ThenBy(k => k.Feature).ThenByDescending(k => k.Sign)
                 .First();
             return (best.Feature, best.Sign);
         }
+
+        /// <summary>
+        /// The rows that train: all of them, or, with candidate groups, each group's top-scoring row (ties go to the earlier row),
+        /// in input order.
+        /// </summary>
+        private static int[] TopPerGroup(int[] rows, IReadOnlyList<int>? candidateGroups, Func<int, double> score) =>
+            candidateGroups is null ? rows
+                : rows.GroupBy(i => candidateGroups[i]).Select(g => g.OrderByDescending(score).ThenBy(i => i).First()).Order().ToArray();
 
         /// <summary>(mean of targets − mean of decoys) / pooled SD; 0 when either class is missing or the feature is constant.</summary>
         internal static double StandardizedMeanDifference(double[] values, bool[] isDecoy)

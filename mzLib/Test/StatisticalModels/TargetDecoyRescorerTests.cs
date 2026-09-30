@@ -280,6 +280,46 @@ public class TargetDecoyRescorerTests
         Assert.That(b, Is.EqualTo(a).Within(a * 0.05 + 5), "negating a feature changes nothing a linear model cannot absorb");
     }
 
+    /// <summary>
+    /// With candidate groups (for example several candidate peaks of one precursor), only each group's top-scoring row
+    /// trains the model, as in pyProphet. Every row is still scored. So extra low-ranked rows added to some groups change
+    /// no other row's score.
+    /// </summary>
+    [Test]
+    public void OnlyEachCandidateGroupsTopRowTrainsTheModel()
+    {
+        var (features, isDecoy, groups, _) = Candidates(800, 800, 1600, shift: 1.2);
+        int n = features.Length;
+        int[] candidateGroups = Enumerable.Range(0, n).ToArray();
+        var before = TargetDecoyRescorer.Score(features, isDecoy, groups, candidateGroups: candidateGroups);
+
+        // A second, far worse candidate for every tenth row, in the same sequence group and candidate group
+        var extra = Enumerable.Range(0, n).Where(i => i % 10 == 0).ToArray();
+        var moreFeatures = features.Concat(extra.Select(i => features[i].Select(v => v - 20).ToArray())).ToArray();
+        var moreDecoy = isDecoy.Concat(extra.Select(i => isDecoy[i])).ToArray();
+        var moreGroups = groups.Concat(extra.Select(i => groups[i])).ToArray();
+        var moreCandidates = candidateGroups.Concat(extra).ToArray();
+        var after = TargetDecoyRescorer.Score(moreFeatures, moreDecoy, moreGroups, candidateGroups: moreCandidates);
+
+        for (int i = 0; i < n; i++)
+            Assert.That(after.Scores[i], Is.EqualTo(before.Scores[i]).Within(1e-9), $"row {i}");
+        Assert.That(extra.Select((row, k) => after.Scores[n + k] < after.Scores[row]), Is.All.True, "the added rows are scored, and lower");
+        Assert.That(after.Status, Is.EqualTo(RescoreStatus.Rescored));
+    }
+
+    /// <summary>When every row is its own candidate group, nothing changes.</summary>
+    [Test]
+    public void SingletonCandidateGroupsChangeNothing()
+    {
+        var (features, isDecoy, groups, _) = Candidates(600, 600, 1200, shift: 1.2);
+
+        var plain = TargetDecoyRescorer.Score(features, isDecoy, groups);
+        var grouped = TargetDecoyRescorer.Score(features, isDecoy, groups, candidateGroups: Enumerable.Range(0, features.Length).ToArray());
+
+        Assert.That(grouped.Scores, Is.EqualTo(plain.Scores).Within(1e-12));
+        Assert.Throws<ArgumentException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, candidateGroups: new int[3]));
+    }
+
     [Test]
     public void RescorerArgumentsAreChecked()
     {
