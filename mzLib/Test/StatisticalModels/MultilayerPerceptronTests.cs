@@ -76,6 +76,18 @@ public class MultilayerPerceptronTests
         Assert.That(x.Select(ensemble.Predict), Is.All.InRange(0.0, 1.0));
     }
 
+    /// <summary>Members train in parallel, and the ensemble is still the same for the same seed.</summary>
+    [Test]
+    public void TheEnsembleIsDeterministicThoughItsMembersTrainInParallel()
+    {
+        var (x, y) = Ring(400, 6);
+
+        var a = MultilayerPerceptron.TrainEnsemble(x, y, members: 4, [8, 4], epochs: 3, seed: 9);
+        var b = MultilayerPerceptron.TrainEnsemble(x, y, members: 4, [8, 4], epochs: 3, seed: 9);
+
+        Assert.That(x.Select(a.Predict), Is.EqualTo(x.Select(b.Predict)));
+    }
+
     [Test]
     public void ArgumentsAreChecked()
     {
