@@ -77,7 +77,7 @@ namespace StatisticalModels
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
-            RescoreModel model = RescoreModel.LinearDiscriminant)
+            RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -92,6 +92,8 @@ namespace StatisticalModels
                 throw new ArgumentOutOfRangeException(nameof(folds), folds, "There must be at least 2 folds.");
             if (iterations < 1)
                 throw new ArgumentOutOfRangeException(nameof(iterations), iterations, "There must be at least 1 iteration.");
+            if (maxNetworkTrainingRows is < 2)
+                throw new ArgumentOutOfRangeException(nameof(maxNetworkTrainingRows), maxNetworkTrainingRows, "The network needs at least 2 training rows.");
             if (!(positiveQValue > 0 && positiveQValue < 1))
                 throw new ArgumentOutOfRangeException(nameof(positiveQValue), positiveQValue, "The q-value cutoff must be in (0, 1).");
             int n = features.Count;
@@ -149,6 +151,13 @@ namespace StatisticalModels
                 if (model == RescoreModel.NeuralNetworkEnsemble && trained)
                 {
                     int[] rows = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                    if (maxNetworkTrainingRows is int cap && rows.Length > cap)
+                    {
+                        // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
+                        // linear score: where the line misses the signal, its top rows are the wrong ones.
+                        var sampler = new Random(31 + f);
+                        rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
+                    }
                     var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
                         NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f);
                     scorer = x => ensemble.PredictLogit(x);

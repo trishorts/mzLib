@@ -376,6 +376,86 @@ public class TargetDecoyRescorerTests
             Assert.That(after.Scores[i], Is.EqualTo(before.Scores[i]).Within(1e-9), $"row {i} in the same fold");
     }
 
+    /// <summary>The fixture for the network's training cap: real targets spread wider than decoys (no line separates them).</summary>
+    private static (List<double[]> Features, List<bool> IsDecoy, List<string> Groups) Ring()
+    {
+        var random = new Random(21);
+        var features = new List<double[]>();
+        var isDecoy = new List<bool>();
+        var groups = new List<string>();
+        void Add(bool decoy, bool real, int i)
+        {
+            double spread = real ? 3.0 : 1.0;
+            features.Add([spread * Gaussian(random), spread * Gaussian(random), Gaussian(random)]);
+            isDecoy.Add(decoy);
+            groups.Add($"{(decoy ? "D" : "T")}{i}");
+        }
+        for (int i = 0; i < 2000; i++) Add(false, true, i);
+        for (int i = 0; i < 2000; i++) Add(false, false, 2000 + i);
+        for (int i = 0; i < 4000; i++) Add(true, false, i);
+        return (features, isDecoy, groups);
+    }
+
+    /// <summary>
+    /// The network can train on a random subsample of each fold's training rows. DIA-NN trains on 267k of 3M precursors;
+    /// on a whole-proteome search, training on all 2.6M rows was two thirds of the time. A cap at least the training size
+    /// changes nothing. (Taking the top rows by the linear score instead was tried first and failed ACappedNetworkStillFindsTheSignal:
+    /// where the line misses the signal, its top rows are the wrong ones.)
+    /// </summary>
+    [Test]
+    public void ANetworkTrainingCapAtLeastTheTrainingSizeChangesNothing()
+    {
+        var (features, isDecoy, groups) = Ring();
+
+        var all = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+        var capped = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 1_000_000);
+
+        Assert.That(capped.Scores, Is.EqualTo(all.Scores));
+    }
+
+    /// <summary>A cap well below the training size is applied, and the network still finds what the line misses.</summary>
+    [Test]
+    public void ACappedNetworkStillFindsTheSignal()
+    {
+        var (features, isDecoy, groups) = Ring();
+        bool[] decoys = isDecoy.ToArray();
+
+        var linear = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15);
+        var all = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+        var capped = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 2000);
+
+        Assert.That(capped.Scores, Is.Not.EqualTo(all.Scores), "about 5,300 training rows per fold, capped at 2,000");
+        Assert.That(TargetsAtQ(capped.Scores, decoys, 0.01), Is.GreaterThan(TargetsAtQ(linear.Scores, decoys, 0.01) + 200));
+    }
+
+    /// <summary>The leakage guarantee holds with a cap: the cap only ever picks among the fold's own training rows.</summary>
+    [Test]
+    public void ACandidatesOwnLabelNeverReachesACappedNetwork()
+    {
+        var (features, isDecoy, groups, _) = Candidates(800, 800, 1600, shift: 1.2);
+        var before = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 600);
+
+        int row = 17;
+        var flipped = isDecoy.ToArray();
+        flipped[row] = !flipped[row];
+        var after = TargetDecoyRescorer.Score(features, flipped, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 600);
+
+        foreach (int i in Enumerable.Range(0, features.Length).Where(i => before.Folds[i] == before.Folds[row]))
+            Assert.That(after.Scores[i], Is.EqualTo(before.Scores[i]).Within(1e-9), $"row {i} in the flipped row's fold");
+    }
+
+    [Test]
+    public void ANetworkTrainingCapBelowTwoIsRefused()
+    {
+        var (features, isDecoy, groups) = Ring();
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups,
+            model: RescoreModel.NeuralNetworkEnsemble, maxNetworkTrainingRows: 1));
+    }
+
     /// <summary>The network model must not manufacture discoveries: with nothing real, about 1% at most, as for the line.</summary>
     [Test]
     public void TheNetworkModelFindsNothingWhereThereIsNothing()
