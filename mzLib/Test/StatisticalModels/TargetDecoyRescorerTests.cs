@@ -351,6 +351,31 @@ public class TargetDecoyRescorerTests
         Assert.That(atOnePercentNetwork, Is.GreaterThan(atOnePercentLinear + 200), $"network {atOnePercentNetwork} vs line {atOnePercentLinear}");
     }
 
+    /// <summary>
+    /// The leakage test for the network model, with candidate groups: flipping one held-out row's label, or adding a
+    /// row to its candidate group, never changes how that row is scored. Only other folds train the model that scores it.
+    /// </summary>
+    [Test]
+    public void ACandidatesOwnLabelNeverReachesTheNetworkThatScoresIt()
+    {
+        var (features, isDecoy, groups, _) = Candidates(800, 800, 1600, shift: 1.2);
+        int[] candidateGroups = Enumerable.Range(0, features.Length).ToArray();
+        var before = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, candidateGroups: candidateGroups,
+            model: RescoreModel.NeuralNetworkEnsemble);
+
+        int row = 17;
+        var flipped = isDecoy.ToArray();
+        flipped[row] = !flipped[row];
+        var after = TargetDecoyRescorer.Score(features, flipped, groups, positiveQValue: 0.15, candidateGroups: candidateGroups,
+            model: RescoreModel.NeuralNetworkEnsemble);
+
+        Assert.That(after.Folds[row], Is.EqualTo(before.Folds[row]));
+        Assert.That(after.Scores[row], Is.EqualTo(before.Scores[row]).Within(1e-9), "the flipped label stayed out of the model scoring it");
+        // Every row of the flipped row's fold is scored by the same model, so all of them are unchanged too
+        foreach (int i in Enumerable.Range(0, features.Length).Where(i => before.Folds[i] == before.Folds[row]))
+            Assert.That(after.Scores[i], Is.EqualTo(before.Scores[i]).Within(1e-9), $"row {i} in the same fold");
+    }
+
     /// <summary>The network model must not manufacture discoveries: with nothing real, about 1% at most, as for the line.</summary>
     [Test]
     public void TheNetworkModelFindsNothingWhereThereIsNothing()

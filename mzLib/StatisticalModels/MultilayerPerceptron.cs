@@ -94,8 +94,10 @@ namespace StatisticalModels
             IReadOnlyList<int> hiddenLayers, int epochs, int seed, int batchSize = 50, double learningRate = 0.003)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(members, 1);
-            return new MultilayerPerceptronEnsemble(Enumerable.Range(0, members)
-                .Select(m => Train(features, isPositive, hiddenLayers, epochs, seed + 7919 * m, batchSize, learningRate)).ToList());
+            // Members train in parallel; each has its own seed, so the result is the same as training them in turn
+            var trained = new MultilayerPerceptron[members];
+            System.Threading.Tasks.Parallel.For(0, members, m => trained[m] = Train(features, isPositive, hiddenLayers, epochs, seed + 7919 * m, batchSize, learningRate));
+            return new MultilayerPerceptronEnsemble(trained);
         }
 
         private void Fit(IReadOnlyList<double[]> features, IReadOnlyList<bool> isPositive, int epochs, int batchSize, double learningRate, Random random)
