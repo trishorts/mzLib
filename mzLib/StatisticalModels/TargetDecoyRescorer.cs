@@ -107,13 +107,14 @@ namespace StatisticalModels
             if (isDecoy.All(d => d))
                 return new RescoreResult(scores, fold, RescoreStatus.NoTargets);
 
-            var status = RescoreStatus.Rescored;
-            for (int f = 0; f < folds; f++)
+            // Folds are independent (each writes only its own held-out rows, with its own seed), so they run in parallel
+            var starved = new bool[folds];
+            System.Threading.Tasks.Parallel.For(0, folds, f =>
             {
                 int[] train = Enumerable.Range(0, n).Where(i => fold[i] != f).ToArray();
                 int[] test = Enumerable.Range(0, n).Where(i => fold[i] == f).ToArray();
                 if (test.Length == 0)
-                    continue;
+                    return;
 
                 var seed = BestSingleFeature(features, isDecoy, train, positiveQValue, candidateGroups);
                 Func<double[], double> scorer = x => seed.Sign * x[seed.Feature];
@@ -143,7 +144,7 @@ namespace StatisticalModels
                     trained = true;
                 }
                 if (!trained)
-                    status = RescoreStatus.FoldStarved;
+                    starved[f] = true;
 
                 if (model == RescoreModel.NeuralNetworkEnsemble && trained)
                 {
@@ -165,8 +166,8 @@ namespace StatisticalModels
                 double scale = threshold > medianDecoy ? threshold - medianDecoy : 1;
                 foreach (int i in test)
                     scores[i] = (scorer(features[i]) - threshold) / scale;
-            }
-            return new RescoreResult(scores, fold, status);
+            });
+            return new RescoreResult(scores, fold, starved.Any(s => s) ? RescoreStatus.FoldStarved : RescoreStatus.Rescored);
         }
 
         /// <summary>
