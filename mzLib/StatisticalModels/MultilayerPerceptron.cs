@@ -26,7 +26,12 @@ namespace StatisticalModels
 
         /// <summary>The probability that <paramref name="features"/> belong to the positive class.</summary>
         /// <exception cref="ArgumentException">The feature count differs from training.</exception>
-        public double Predict(double[] features)
+        public double Predict(double[] features) => Sigmoid(PredictLogit(features));
+
+        /// <summary>The log-odds that <paramref name="features"/> belong to the positive class: the output before the sigmoid,
+        /// which keeps its resolution where the probability has rounded to 0 or 1.</summary>
+        /// <exception cref="ArgumentException">The feature count differs from training.</exception>
+        public double PredictLogit(double[] features)
         {
             ArgumentNullException.ThrowIfNull(features);
             if (features.Length != _mean.Length)
@@ -34,7 +39,7 @@ namespace StatisticalModels
             double[] activation = Standardise(features);
             for (int l = 0; l < _weights.Length; l++)
                 activation = Layer(activation, l, last: l == _weights.Length - 1);
-            return Sigmoid(activation[0]);
+            return activation[0];
         }
 
         /// <param name="hiddenLayers">Units in each hidden layer, input side first.</param>
@@ -217,5 +222,24 @@ namespace StatisticalModels
 
         /// <summary>The members' mean probability.</summary>
         public double Predict(double[] features) => Members.Average(m => m.Predict(features));
+
+        /// <summary>
+        /// The log-odds of the members' mean probability, computed from their logits so that it never saturates: a confident
+        /// member's probability rounds to exactly 1 in double precision, and every confident row would tie.
+        /// </summary>
+        public double PredictLogit(double[] features) => LogitOfMeanProbability(Members.Select(m => m.PredictLogit(features)).ToArray());
+
+        /// <summary>log(mean sigmoid(z)) - log(mean sigmoid(-z)), each a log-sum-exp of log-sigmoids.</summary>
+        internal static double LogitOfMeanProbability(IReadOnlyList<double> logits) =>
+            LogSumExp(logits.Select(z => -Softplus(-z))) - LogSumExp(logits.Select(z => -Softplus(z)));
+
+        private static double Softplus(double t) => Math.Max(t, 0) + Math.Log(1 + Math.Exp(-Math.Abs(t)));
+
+        private static double LogSumExp(IEnumerable<double> values)
+        {
+            double[] v = values.ToArray();
+            double max = v.Max();
+            return max + Math.Log(v.Sum(x => Math.Exp(x - max)));
+        }
     }
 }

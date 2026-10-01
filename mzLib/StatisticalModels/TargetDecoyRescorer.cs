@@ -151,7 +151,7 @@ namespace StatisticalModels
                     int[] rows = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
                     var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
                         NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f);
-                    scorer = x => Logit(ensemble.Predict(x));
+                    scorer = x => ensemble.PredictLogit(x);
                 }
 
                 // Normalize on the training rows so that folds are comparable when pooled
@@ -185,12 +185,6 @@ namespace StatisticalModels
         private const int NetworkMembers = 5;
         private const int NetworkEpochs = 10;
         private static readonly int[] NetworkLayers = [25, 20, 15, 10, 5]; // DIA-NN 2020's architecture
-
-        private static double Logit(double p)
-        {
-            double clamped = Math.Clamp(p, 1e-12, 1 - 1e-12);
-            return Math.Log(clamped / (1 - clamped));
-        }
 
         /// <summary>Fewer training positives than this and the training cutoff is relaxed.</summary>
         internal const int MinimumPositives = 10;

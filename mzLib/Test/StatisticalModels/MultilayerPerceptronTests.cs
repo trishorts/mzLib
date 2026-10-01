@@ -88,6 +88,45 @@ public class MultilayerPerceptronTests
         Assert.That(x.Select(a.Predict), Is.EqualTo(x.Select(b.Predict)));
     }
 
+    /// <summary>
+    /// The ensemble's log-odds, computed from the members' raw logits. Where probabilities are moderate it is the logit of
+    /// the mean probability.
+    /// </summary>
+    [Test]
+    public void TheEnsembleLogitIsTheLogOddsOfItsMeanProbability()
+    {
+        var (x, y) = Ring(500, 8);
+        var ensemble = MultilayerPerceptron.TrainEnsemble(x, y, members: 3, [8, 4], epochs: 5, seed: 3);
+
+        foreach (var v in x.Take(50))
+        {
+            double p = ensemble.Predict(v);
+            Assert.That(ensemble.PredictLogit(v), Is.EqualTo(Math.Log(p / (1 - p))).Within(1e-9));
+        }
+    }
+
+    /// <summary>
+    /// A confident member's probability rounds to exactly 1 in double precision (from a logit of about 37), so every
+    /// confident row would get the same score and its order would be lost. On the whole-proteome DIA search, saturated
+    /// targets and decoys tied and the folds' normalisation decided between them. Computed from the logits, confident
+    /// rows stay distinct and ordered.
+    /// </summary>
+    [Test]
+    public void ConfidentPredictionsStayDistinctAndOrdered()
+    {
+        double a = MultilayerPerceptronEnsemble.LogitOfMeanProbability([40, 45]);
+        double b = MultilayerPerceptronEnsemble.LogitOfMeanProbability([41, 45]);
+        double c = MultilayerPerceptronEnsemble.LogitOfMeanProbability([60, 70]);
+
+        Assert.That(1 / (1 + Math.Exp(-40.0)), Is.EqualTo(1.0), "the naive probability has saturated");
+        Assert.That(new[] { a, b, c }, Is.All.Matches<double>(double.IsFinite));
+        Assert.That(a, Is.LessThan(b));
+        Assert.That(b, Is.LessThan(c));
+        // log-odds of the mean probability: 1 - p averages exp(-40) and exp(-45)
+        Assert.That(a, Is.EqualTo(-Math.Log((Math.Exp(-40) + Math.Exp(-45)) / 2)).Within(1e-9));
+        Assert.That(MultilayerPerceptronEnsemble.LogitOfMeanProbability([-60, -70]), Is.EqualTo(-c).Within(1e-9), "symmetric for negatives");
+    }
+
     [Test]
     public void ArgumentsAreChecked()
     {
