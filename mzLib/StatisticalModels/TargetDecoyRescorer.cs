@@ -118,13 +118,14 @@ namespace StatisticalModels
                 if (test.Length == 0)
                     return;
 
+                var trainGroups = RowGroups.Of(train, candidateGroups);
                 var seed = BestSingleFeature(features, isDecoy, train, positiveQValue, candidateGroups);
                 Func<double[], double> scorer = x => seed.Sign * x[seed.Feature];
                 bool trained = false;
                 for (int iteration = 0; iteration < iterations; iteration++)
                 {
                     // Only each candidate group's top row under the current model trains it (pyProphet)
-                    int[] active = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                    int[] active = TopPerGroup(trainGroups, i => scorer(features[i]));
                     double[] trainScores = active.Select(i => scorer(features[i])).ToArray();
                     double[] q = QValues(trainScores, active.Select(i => isDecoy[i]).ToArray());
                     double cutoff = TrainingCutoff(q, active.Select(i => isDecoy[i]).ToArray(), positiveQValue);
@@ -150,7 +151,7 @@ namespace StatisticalModels
 
                 if (model == RescoreModel.NeuralNetworkEnsemble && trained)
                 {
-                    int[] rows = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                    int[] rows = TopPerGroup(trainGroups, i => scorer(features[i]));
                     if (maxNetworkTrainingRows is int cap && rows.Length > cap)
                     {
                         // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
@@ -164,7 +165,7 @@ namespace StatisticalModels
                 }
 
                 // Normalize on the training rows so that folds are comparable when pooled
-                int[] finalActive = TopPerGroup(train, candidateGroups, i => scorer(features[i]));
+                int[] finalActive = TopPerGroup(trainGroups, i => scorer(features[i]));
                 double[] finalTrain = finalActive.Select(i => scorer(features[i])).ToArray();
                 bool[] trainDecoy = finalActive.Select(i => isDecoy[i]).ToArray();
                 double[] finalQ = QValues(finalTrain, trainDecoy);
@@ -228,12 +229,13 @@ namespace StatisticalModels
         {
             int p = features.Count == 0 ? 0 : features[0].Length;
             var candidates = new List<(int Feature, int Sign, double Separation, double[] Q, bool[] Decoy)>();
+            var groups = RowGroups.Of(train, candidateGroups);
             for (int j = 0; j < p; j++)
             {
                 foreach (int sign in new[] { 1, -1 })
                 {
                     // With candidate groups, each feature and sign judges only the group rows it ranks top
-                    int[] rows = TopPerGroup(train, candidateGroups, i => sign * features[i][j]);
+                    int[] rows = TopPerGroup(groups, i => sign * features[i][j]);
                     bool[] rowDecoy = rows.Select(i => isDecoy[i]).ToArray();
                     double[] values = rows.Select(i => features[i][j]).ToArray();
                     double separation = StandardizedMeanDifference(values, rowDecoy);
@@ -257,9 +259,67 @@ namespace StatisticalModels
         /// The rows that train: all of them, or, with candidate groups, each group's top-scoring row (ties go to the earlier row),
         /// in input order.
         /// </summary>
-        private static int[] TopPerGroup(int[] rows, IReadOnlyList<int>? candidateGroups, Func<int, double> score) =>
-            candidateGroups is null ? rows
-                : rows.GroupBy(i => candidateGroups[i]).Select(g => g.OrderByDescending(score).ThenBy(i => i).First()).Order().ToArray();
+        private static int[] TopPerGroup(RowGroups groups, Func<int, double> score)
+        {
+            if (groups.Multiple.Length == 0)
+                return groups.Singles;
+            var top = new int[groups.Singles.Length + groups.Multiple.Length];
+            groups.Singles.CopyTo(top, 0);
+            int k = groups.Singles.Length;
+            foreach (int[] members in groups.Multiple)
+            {
+                // Highest score; ties go to the earlier row (members are in ascending row order)
+                int best = members[0];
+                double bestScore = score(best);
+                for (int m = 1; m < members.Length; m++)
+                {
+                    double s = score(members[m]);
+                    if (s > bestScore)
+                    {
+                        best = members[m];
+                        bestScore = s;
+                    }
+                }
+                top[k++] = best;
+            }
+            Array.Sort(top);
+            return top;
+        }
+
+        /// <summary>
+        /// Rows split by candidate group once, so that picking each group's top row under a new score is one pass with no
+        /// regrouping. Without candidate groups every row is its own group.
+        /// </summary>
+        private sealed class RowGroups
+        {
+            private RowGroups(int[] singles, int[][] multiple)
+            {
+                Singles = singles;
+                Multiple = multiple;
+            }
+
+            /// <summary>Rows alone in their group, in ascending order.</summary>
+            public int[] Singles { get; }
+
+            /// <summary>Groups of two or more rows, each in ascending row order.</summary>
+            public int[][] Multiple { get; }
+
+            public static RowGroups Of(int[] rows, IReadOnlyList<int>? candidateGroups)
+            {
+                if (candidateGroups is null)
+                    return new RowGroups(rows, []);
+                var byGroup = new Dictionary<int, List<int>>();
+                foreach (int i in rows)
+                {
+                    if (!byGroup.TryGetValue(candidateGroups[i], out var list))
+                        byGroup[candidateGroups[i]] = list = [];
+                    list.Add(i);
+                }
+                var singles = byGroup.Values.Where(g => g.Count == 1).Select(g => g[0]).Order().ToArray();
+                var multiple = byGroup.Values.Where(g => g.Count > 1).Select(g => g.Order().ToArray()).ToArray();
+                return new RowGroups(singles, multiple);
+            }
+        }
 
         /// <summary>(mean of targets − mean of decoys) / pooled SD; 0 when either class is missing or the feature is constant.</summary>
         internal static double StandardizedMeanDifference(double[] values, bool[] isDecoy)
