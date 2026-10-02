@@ -448,6 +448,25 @@ public class TargetDecoyRescorerTests
             Assert.That(after.Scores[i], Is.EqualTo(before.Scores[i]).Within(1e-9), $"row {i} in the flipped row's fold");
     }
 
+    /// <summary>
+    /// The network's random seed is a parameter, so a caller can measure how much a result moves for reasons that are only
+    /// random: the same data with another seed. The default seed reproduces earlier results exactly.
+    /// </summary>
+    [Test]
+    public void TheNetworkSeedIsAParameterAndTheDefaultIsUnchanged()
+    {
+        var (features, isDecoy, groups) = Ring();
+
+        var before = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+        var seed0 = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble, randomSeed: 0);
+        var seed1 = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble, randomSeed: 1);
+        var seed1Again = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble, randomSeed: 1);
+
+        Assert.That(seed0.Scores, Is.EqualTo(before.Scores));
+        Assert.That(seed1.Scores, Is.Not.EqualTo(seed0.Scores));
+        Assert.That(seed1Again.Scores, Is.EqualTo(seed1.Scores), "a seed is deterministic");
+    }
+
     [Test]
     public void ANetworkTrainingCapBelowTwoIsRefused()
     {
