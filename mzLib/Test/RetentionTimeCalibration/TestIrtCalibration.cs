@@ -218,6 +218,30 @@ public class TestIrtCalibration
         Assert.Throws<ArgumentOutOfRangeException>(() => IrtCalibration.Fit(anchors, new IrtCalibrationOptions(RobustnessIterations: -1)));
     }
 
+    /// <summary>The smallest legal values of each option are accepted, not only the defaults.</summary>
+    [Test]
+    public void TheSmallestLegalOptionsAreAccepted()
+    {
+        var anchors = Anchors(TrueIrt, 100, noiseSd: 0.5);
+
+        Assert.DoesNotThrow(() => IrtCalibration.Fit(anchors.Take(3).ToList(), new IrtCalibrationOptions(Kind: IrtCalibrationKind.Linear, MinimumAnchors: 3)));
+        Assert.DoesNotThrow(() => IrtCalibration.Fit(anchors, new IrtCalibrationOptions(Knots: 3)));
+        Assert.DoesNotThrow(() => IrtCalibration.Fit(anchors, new IrtCalibrationOptions(Bandwidth: 1)));
+        Assert.DoesNotThrow(() => IrtCalibration.Fit(anchors, new IrtCalibrationOptions(RobustnessIterations: 0)));
+    }
+
+    /// <summary>The first and last anchors are inside the fitted range; only beyond them is extrapolated.</summary>
+    [Test]
+    public void TheAnchorsThemselvesAreNotExtrapolated()
+    {
+        var model = IrtCalibration.Fit(Anchors(TrueIrt, 200, noiseSd: 0.5));
+
+        Assert.That(model.IsExtrapolated(model.FirstAnchor), Is.False);
+        Assert.That(model.IsExtrapolated(model.LastAnchor), Is.False);
+        Assert.That(model.IsExtrapolated(new RtMinutes(model.FirstAnchor.Value - 1e-9)), Is.True);
+        Assert.That(model.IsExtrapolated(new RtMinutes(model.LastAnchor.Value + 1e-9)), Is.True);
+    }
+
     [Test]
     public void TheModelReportsWhatItWasFittedOn()
     {
@@ -261,5 +285,48 @@ public class TestIrtCalibration
             Assert.That(type.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.Name is "op_Implicit" or "op_Explicit"), Is.Empty, type.Name);
         Assert.That(new Irt(12.5).ToString(), Is.EqualTo("12.5 iRT"));
         Assert.That(new RtMinutes(3.25).ToString(), Is.EqualTo("3.25 min"));
+    }
+
+    /// <summary>
+    /// A first pass on PXD022589 (HF-X) found its anchors at 42-54 min, where its provisional line was right, plus about 20
+    /// false ones scattered over 12-30 min, where nothing elutes. Lying near the curve's extrapolation, they kept some weight,
+    /// were the nearest anchors to the early knots, and bent the curve; the search then lost 20% of its precursors. A stretch
+    /// of the run with almost no anchors must not shape the curve: it is extrapolated from where the anchors are.
+    /// </summary>
+    [Test]
+    public void AFewAnchorsInAnEmptyStretchDoNotBendTheCurve()
+    {
+        static double Truth(double minutes) => 67 + 13.4 * (minutes - 45);
+        var random = new Random(5);
+        var right = Anchors(Truth, 1100, noiseSd: 2, minRt: 42, maxRt: 54);
+        var withStray = right.ToList();
+        for (int i = 0; i < 22; i++)
+        {
+            double rt = 12 + random.NextDouble() * 18;
+            withStray.Add((new RtMinutes(rt), new Irt(Truth(rt) + 8 + 2 * Gaussian(random))));
+        }
+
+        var model = IrtCalibration.Fit(withStray);
+        var unbent = IrtCalibration.Fit(right);
+
+        Assert.That(model.AnchorCount, Is.EqualTo(1100));
+        foreach (double minutes in new[] { 15.0, 20, 25, 30, 35, 42, 48, 54 })
+            Assert.That(model.ToIrt(new RtMinutes(minutes)).Value, Is.EqualTo(unbent.ToIrt(new RtMinutes(minutes)).Value).Within(1e-9), $"at {minutes} min");
+        // Kept, the stray anchors pull the extrapolated stretch toward themselves
+        var bent = IrtCalibration.Fit(withStray, new IrtCalibrationOptions(MinimumBinShare: 0));
+        Assert.That(bent.ToIrt(new RtMinutes(20)).Value - unbent.ToIrt(new RtMinutes(20)).Value, Is.GreaterThan(3));
+    }
+
+    /// <summary>Anchors spread thinly but evenly over the run are all kept: thin is not empty.</summary>
+    [Test]
+    public void EvenlySparseAnchorsAreAllUsed()
+    {
+        var anchors = Anchors(TrueIrt, 60, noiseSd: 1);
+
+        var model = IrtCalibration.Fit(anchors);
+
+        Assert.That(model.AnchorCount, Is.EqualTo(60));
+        for (double minutes = 5; minutes <= 35; minutes += 5)
+            Assert.That(model.ToIrt(new RtMinutes(minutes)).Value, Is.EqualTo(TrueIrt(minutes)).Within(2.0), $"at {minutes} min");
     }
 }
