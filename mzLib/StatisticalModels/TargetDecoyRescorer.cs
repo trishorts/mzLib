@@ -70,6 +70,16 @@ namespace StatisticalModels
     /// passing the q-value cutoff against all decoys, then re-ranks.
     /// </para>
     /// </summary>
+    /// <summary>Which rows train the network when a fold has more than the cap.</summary>
+    public enum NetworkTrainingSample
+    {
+        /// <summary>A random sample of the fold's training rows.</summary>
+        Random,
+
+        /// <summary>Half from the targets the linear model ranks highest, half from the decoys it ranks highest.</summary>
+        Confident,
+    }
+
     public static class TargetDecoyRescorer
     {
         /// <param name="networkPasses">
@@ -77,13 +87,19 @@ namespace StatisticalModels
         /// each later pass re-picks the top rows with the previous network and trains a new one, as DIA-NN trains twice.
         /// 1 by default.
         /// </param>
+        /// <param name="networkTrainingSample">
+        /// Network model only: which rows train it when a fold has more than <paramref name="maxNetworkTrainingRows"/>. Random by
+        /// default; Confident takes the highest-ranked targets and decoys, half each, as DIA-NN trains after removing
+        /// low-confidence identifications.
+        /// </param>
         /// <exception cref="ArgumentNullException">An argument is null.</exception>
         /// <exception cref="ArgumentException">Lengths disagree, rows are ragged, or a value is not finite.</exception>
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
             RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
-            int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1)
+            int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1,
+            NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -178,12 +194,20 @@ namespace StatisticalModels
                             pick = i => current[i];
                         }
                         int[] rows = TopPerGroup(trainGroups, pick);
-                        if (maxNetworkTrainingRows is int cap && rows.Length > cap)
+                        if (maxNetworkTrainingRows is int cap && rows.Length > cap && networkTrainingSample == NetworkTrainingSample.Confident)
+                        {
+                            // As DIA-NN removes low-confidence identifications before training: the targets and the decoys
+                            // ranked highest, half the cap each, so real targets are a large share of the positives
+                            var ranked = rows.OrderByDescending(pick).ThenBy(i => i).ToArray();
+                            rows = ranked.Where(i => !isDecoy[i]).Take(cap / 2)
+                                .Concat(ranked.Where(i => isDecoy[i]).Take(cap - cap / 2)).Order().ToArray();
+                        }
+                        else if (maxNetworkTrainingRows is int cap2 && rows.Length > cap2)
                         {
                             // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
                             // linear score: where the line misses the signal, its top rows are the wrong ones.
                             var sampler = new Random(31 + f + 1000 * randomSeed + 100_000 * pass);
-                            rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
+                            rows = rows.OrderBy(_ => sampler.Next()).Take(cap2).Order().ToArray();
                         }
                         var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
                             networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);

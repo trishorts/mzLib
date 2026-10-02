@@ -752,4 +752,28 @@ public class TargetDecoyRescorerTests
     }
 
     #endregion
+
+    #region confident network training sample
+
+    /// <summary>
+    /// A whole-proteome DIA search has about one real target in twenty, so a random training sample teaches the network
+    /// mostly noise against decoys. DIA-NN removes low-confidence identifications first and trains on about 156k targets and
+    /// 138k decoys. The confident sample takes half its rows from the targets the line ranks highest and half from the decoys
+    /// it ranks highest.
+    /// </summary>
+    [Test]
+    public void AConfidentTrainingSampleBeatsARandomOneWhenFewTargetsAreReal()
+    {
+        var (features, isDecoy, groups, _) = Candidates(500, 9500, 10000, shift: 2.5);
+
+        var random = TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 600);
+        var confident = TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble,
+            maxNetworkTrainingRows: 600, networkTrainingSample: NetworkTrainingSample.Confident);
+
+        int byRandom = TargetsAtQ(random.Scores, isDecoy, 0.01), byConfident = TargetsAtQ(confident.Scores, isDecoy, 0.01);
+        Assert.That(byConfident, Is.GreaterThan(byRandom + 30), $"confident {byConfident} vs random {byRandom}");
+    }
+
+    #endregion
 }
