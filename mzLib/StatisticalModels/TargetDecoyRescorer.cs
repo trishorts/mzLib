@@ -169,9 +169,14 @@ namespace StatisticalModels
                     scorer = x => ensemble.PredictLogit(x);
                 }
 
+                // Every row scored once, in parallel: the folds alone use three cores, and a network ensemble over millions
+                // of rows otherwise costs more than training it
+                var final = new double[n];
+                System.Threading.Tasks.Parallel.For(0, n, i => final[i] = scorer(features[i]));
+
                 // Normalize on the training rows so that folds are comparable when pooled
-                int[] finalActive = TopPerGroup(trainGroups, i => scorer(features[i]));
-                double[] finalTrain = finalActive.Select(i => scorer(features[i])).ToArray();
+                int[] finalActive = TopPerGroup(trainGroups, i => final[i]);
+                double[] finalTrain = finalActive.Select(i => final[i]).ToArray();
                 bool[] trainDecoy = finalActive.Select(i => isDecoy[i]).ToArray();
                 double[] finalQ = QValues(finalTrain, trainDecoy);
                 double[] decoyScores = finalTrain.Where((_, t) => trainDecoy[t]).Order().ToArray();
@@ -180,7 +185,7 @@ namespace StatisticalModels
                 double threshold = passing.Length > 0 ? passing.Min() : (decoyScores.Length > 0 ? decoyScores[^1] : medianDecoy + 1);
                 double scale = threshold > medianDecoy ? threshold - medianDecoy : 1;
                 foreach (int i in test)
-                    scores[i] = (scorer(features[i]) - threshold) / scale;
+                    scores[i] = (final[i] - threshold) / scale;
             });
             return new RescoreResult(scores, fold, starved.Any(s => s) ? RescoreStatus.FoldStarved : RescoreStatus.Rescored);
         }
