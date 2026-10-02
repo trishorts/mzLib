@@ -702,4 +702,54 @@ public class TargetDecoyRescorerTests
     }
 
     #endregion
+
+    #region second network pass
+
+    /// <summary>
+    /// The network trains on each candidate group's top row, picked by the linear model. Where the line cannot tell the real
+    /// candidate from noise (here the real one only spreads wider), the network learns from mostly wrong rows. A second pass,
+    /// as DIA-NN trains its networks twice, re-picks each group's top row with the first network and trains again.
+    /// </summary>
+    [Test]
+    public void ASecondNetworkPassTrainsOnTheRowsTheFirstNetworkPicked()
+    {
+        var random = new Random(31);
+        var features = new List<double[]>();
+        var isDecoy = new List<bool>();
+        var groups = new List<string>();
+        var candidateGroups = new List<int>();
+        int group = 0;
+        void AddGroup(bool decoy, bool hasReal, int i)
+        {
+            for (int c = 0; c < 3; c++)
+            {
+                double spread = hasReal && c == 0 ? 3.0 : 1.0;
+                features.Add([spread * Gaussian(random), spread * Gaussian(random), Gaussian(random)]);
+                isDecoy.Add(decoy);
+                groups.Add($"{(decoy ? "D" : "T")}{i}");
+                candidateGroups.Add(group);
+            }
+            group++;
+        }
+        for (int i = 0; i < 1500; i++) AddGroup(false, true, i);
+        for (int i = 0; i < 1500; i++) AddGroup(false, false, 1500 + i);
+        for (int i = 0; i < 3000; i++) AddGroup(true, false, i);
+
+        int GroupsAtOnePercent(double[] scores)
+        {
+            var best = Enumerable.Range(0, group).Select(g => Enumerable.Range(3 * g, 3).Max(r => scores[r])).ToArray();
+            var decoyGroup = Enumerable.Range(0, group).Select(g => isDecoy[3 * g]).ToArray();
+            return TargetsAtQ(best, decoyGroup, 0.01);
+        }
+        var once = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, candidateGroups: candidateGroups,
+            model: RescoreModel.NeuralNetworkEnsemble);
+        var twice = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, candidateGroups: candidateGroups,
+            model: RescoreModel.NeuralNetworkEnsemble, networkPasses: 2);
+
+        int first = GroupsAtOnePercent(once.Scores), second = GroupsAtOnePercent(twice.Scores);
+        Assert.That(second, Is.GreaterThan(first + 100), $"two passes {second} vs one {first}");
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, networkPasses: 0));
+    }
+
+    #endregion
 }

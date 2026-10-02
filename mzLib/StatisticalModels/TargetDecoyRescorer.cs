@@ -72,13 +72,18 @@ namespace StatisticalModels
     /// </summary>
     public static class TargetDecoyRescorer
     {
+        /// <param name="networkPasses">
+        /// Network model only: training passes. The first trains on each candidate group's top row by the linear model;
+        /// each later pass re-picks the top rows with the previous network and trains a new one, as DIA-NN trains twice.
+        /// 1 by default.
+        /// </param>
         /// <exception cref="ArgumentNullException">An argument is null.</exception>
         /// <exception cref="ArgumentException">Lengths disagree, rows are ragged, or a value is not finite.</exception>
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
             RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
-            int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs)
+            int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -97,6 +102,8 @@ namespace StatisticalModels
                 throw new ArgumentOutOfRangeException(nameof(networkMembers), networkMembers, "The ensemble needs at least one network.");
             if (networkEpochs < 1)
                 throw new ArgumentOutOfRangeException(nameof(networkEpochs), networkEpochs, "Training needs at least one epoch.");
+            if (networkPasses < 1)
+                throw new ArgumentOutOfRangeException(nameof(networkPasses), networkPasses, "The network needs at least one training pass.");
             if (maxNetworkTrainingRows is < 2)
                 throw new ArgumentOutOfRangeException(nameof(maxNetworkTrainingRows), maxNetworkTrainingRows, "The network needs at least 2 training rows.");
             if (!(positiveQValue > 0 && positiveQValue < 1))
@@ -156,17 +163,32 @@ namespace StatisticalModels
 
                 if (model == RescoreModel.NeuralNetworkEnsemble && trained)
                 {
-                    int[] rows = TopPerGroup(trainGroups, i => scorer(features[i]));
-                    if (maxNetworkTrainingRows is int cap && rows.Length > cap)
+                    for (int pass = 0; pass < networkPasses; pass++)
                     {
-                        // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
-                        // linear score: where the line misses the signal, its top rows are the wrong ones.
-                        var sampler = new Random(31 + f + 1000 * randomSeed);
-                        rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
+                        // Each group's top row trains the network: by the line on the first pass, and on each later pass by
+                        // the previous network, which can tell the real candidate where the line cannot (DIA-NN trains twice)
+                        Func<int, double> pick;
+                        if (pass == 0)
+                            pick = i => scorer(features[i]);
+                        else
+                        {
+                            var previous = scorer;
+                            var current = new double[n];
+                            System.Threading.Tasks.Parallel.ForEach(train, i => current[i] = previous(features[i]));
+                            pick = i => current[i];
+                        }
+                        int[] rows = TopPerGroup(trainGroups, pick);
+                        if (maxNetworkTrainingRows is int cap && rows.Length > cap)
+                        {
+                            // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
+                            // linear score: where the line misses the signal, its top rows are the wrong ones.
+                            var sampler = new Random(31 + f + 1000 * randomSeed + 100_000 * pass);
+                            rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
+                        }
+                        var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
+                            networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);
+                        scorer = x => ensemble.PredictLogit(x);
                     }
-                    var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
-                        networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed);
-                    scorer = x => ensemble.PredictLogit(x);
                 }
 
                 // Every row scored once, in parallel: the folds alone use three cores, and a network ensemble over millions
