@@ -77,7 +77,7 @@ namespace StatisticalModels
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
-            RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null)
+            RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -156,11 +156,11 @@ namespace StatisticalModels
                     {
                         // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
                         // linear score: where the line misses the signal, its top rows are the wrong ones.
-                        var sampler = new Random(31 + f);
+                        var sampler = new Random(31 + f + 1000 * randomSeed);
                         rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
                     }
                     var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
-                        NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f);
+                        NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f + 1000 * randomSeed);
                     scorer = x => ensemble.PredictLogit(x);
                 }
 
