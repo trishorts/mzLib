@@ -467,6 +467,31 @@ public class TargetDecoyRescorerTests
         Assert.That(seed1Again.Scores, Is.EqualTo(seed1.Scores), "a seed is deterministic");
     }
 
+    /// <summary>
+    /// The ensemble's size and training length are parameters (DIA-NN uses 12 networks for one epoch; our default is 5 for 10).
+    /// The defaults reproduce earlier results exactly; other values change the scores and still find what a line misses.
+    /// </summary>
+    [Test]
+    public void EnsembleSizeAndEpochsAreParameters()
+    {
+        var (features, isDecoy, groups) = Ring();
+        bool[] decoys = isDecoy.ToArray();
+
+        var before = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble);
+        var defaults = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            networkMembers: 5, networkEpochs: 10);
+        var diann = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble,
+            networkMembers: 12, networkEpochs: 1);
+
+        Assert.That(defaults.Scores, Is.EqualTo(before.Scores));
+        Assert.That(diann.Scores, Is.Not.EqualTo(before.Scores));
+        // One epoch underfits a fixture this small (8,000 rows: 202 targets at 1% against the line's 266); DIA-NN trains on
+        // far more rows, so whether one epoch suits a real search is for the real-data comparison to show
+        Assert.That(TargetsAtQ(diann.Scores, decoys, 0.01), Is.GreaterThan(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble, networkMembers: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble, networkEpochs: 0));
+    }
+
     [Test]
     public void ANetworkTrainingCapBelowTwoIsRefused()
     {

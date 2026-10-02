@@ -77,7 +77,8 @@ namespace StatisticalModels
         /// <exception cref="ArgumentOutOfRangeException">A count or the q-value cutoff is out of range.</exception>
         public static RescoreResult Score(IReadOnlyList<double[]> features, IReadOnlyList<bool> isDecoy, IReadOnlyList<string> groupKeys,
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
-            RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0)
+            RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
+            int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -92,6 +93,10 @@ namespace StatisticalModels
                 throw new ArgumentOutOfRangeException(nameof(folds), folds, "There must be at least 2 folds.");
             if (iterations < 1)
                 throw new ArgumentOutOfRangeException(nameof(iterations), iterations, "There must be at least 1 iteration.");
+            if (networkMembers < 1)
+                throw new ArgumentOutOfRangeException(nameof(networkMembers), networkMembers, "The ensemble needs at least one network.");
+            if (networkEpochs < 1)
+                throw new ArgumentOutOfRangeException(nameof(networkEpochs), networkEpochs, "Training needs at least one epoch.");
             if (maxNetworkTrainingRows is < 2)
                 throw new ArgumentOutOfRangeException(nameof(maxNetworkTrainingRows), maxNetworkTrainingRows, "The network needs at least 2 training rows.");
             if (!(positiveQValue > 0 && positiveQValue < 1))
@@ -160,7 +165,7 @@ namespace StatisticalModels
                         rows = rows.OrderBy(_ => sampler.Next()).Take(cap).Order().ToArray();
                     }
                     var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
-                        NetworkMembers, NetworkLayers, NetworkEpochs, seed: 17 + f + 1000 * randomSeed);
+                        networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed);
                     scorer = x => ensemble.PredictLogit(x);
                 }
 
@@ -192,8 +197,8 @@ namespace StatisticalModels
             return groupKeys.Select(key => foldOfGroup[key]).ToArray();
         }
 
-        private const int NetworkMembers = 5;
-        private const int NetworkEpochs = 10;
+        public const int NetworkMembers = 5;
+        public const int NetworkEpochs = 10;
         private static readonly int[] NetworkLayers = [25, 20, 15, 10, 5]; // DIA-NN 2020's architecture
 
         /// <summary>Fewer training positives than this and the training cutoff is relaxed.</summary>
