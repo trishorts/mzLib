@@ -169,4 +169,35 @@ public class PickedTargetDecoyTests
     }
 
     #endregion
+
+    /// <summary>
+    /// The q-value sort was rewritten for speed (the rescorer computes it for every feature and sign of every fold); on
+    /// heavily tied scores it must reproduce the original stable LINQ order exactly.
+    /// </summary>
+    [Test]
+    public void QValuesMatchTheOriginalOrderingOnTiedScores()
+    {
+        var random = new Random(9);
+        for (int trial = 0; trial < 20; trial++)
+        {
+            int n = 500 + trial * 37;
+            double[] scores = Enumerable.Range(0, n).Select(_ => (double)random.Next(0, 40)).ToArray();
+            bool[] decoy = Enumerable.Range(0, n).Select(_ => random.NextDouble() < 0.4).ToArray();
+            int[] order = Enumerable.Range(0, n).OrderByDescending(i => scores[i]).ThenByDescending(i => decoy[i]).ThenBy(i => i).ToArray();
+            var ranked = new double[n];
+            int d = 0, t = 0;
+            for (int k = 0; k < n; k++)
+            {
+                if (decoy[order[k]]) d++; else t++;
+                ranked[k] = t == 0 ? 1 : Math.Min(1, (d + 1.0) / t);
+            }
+            for (int k = n - 2; k >= 0; k--)
+                ranked[k] = Math.Min(ranked[k], ranked[k + 1]);
+            var expected = new double[n];
+            for (int k = 0; k < n; k++)
+                expected[order[k]] = ranked[k];
+
+            Assert.That(TargetDecoyQValues.Compute(scores, decoy), Is.EqualTo(expected), $"trial {trial}");
+        }
+    }
 }
