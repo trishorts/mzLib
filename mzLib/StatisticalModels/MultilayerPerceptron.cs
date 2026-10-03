@@ -36,10 +36,46 @@ namespace StatisticalModels
             ArgumentNullException.ThrowIfNull(features);
             if (features.Length != _mean.Length)
                 throw new ArgumentException($"Expected {_mean.Length} features; got {features.Length}.", nameof(features));
-            double[] activation = Standardise(features);
+            Span<double> first = stackalloc double[Width];
+            Span<double> second = stackalloc double[Width];
+            return Forward(features, first, second);
+        }
+
+        /// <summary>Features the network was trained on.</summary>
+        internal int InputCount => _mean.Length;
+
+        /// <summary>The widest layer, inputs included: the size of each buffer <see cref="Forward"/> needs.</summary>
+        internal int Width => Math.Max(_mean.Length, _weights.Max(w => w.GetLength(1)));
+
+        /// <summary>
+        /// <see cref="PredictLogit(double[])"/> on two caller buffers of at least <see cref="Width"/>, allocating nothing:
+        /// prediction is the hot loop of a DIA rescoring. Same arithmetic, in the same order.
+        /// </summary>
+        internal double Forward(double[] features, Span<double> first, Span<double> second)
+        {
+            int width = _mean.Length;
+            for (int j = 0; j < width; j++)
+                first[j] = (features[j] - _mean[j]) / _sd[j];
+            bool inFirst = true;
             for (int l = 0; l < _weights.Length; l++)
-                activation = Layer(activation, l, last: l == _weights.Length - 1);
-            return activation[0];
+            {
+                var w = _weights[l];
+                var bias = _biases[l];
+                bool last = l == _weights.Length - 1;
+                Span<double> input = (inFirst ? first : second)[..width];
+                Span<double> output = inFirst ? second : first;
+                int outputs = w.GetLength(1);
+                for (int o = 0; o < outputs; o++)
+                {
+                    double z = bias[o];
+                    for (int i = 0; i < width; i++)
+                        z += input[i] * w[i, o];
+                    output[o] = last ? z : Math.Tanh(z);
+                }
+                width = outputs;
+                inFirst = !inFirst;
+            }
+            return (inFirst ? first : second)[0];
         }
 
         /// <param name="hiddenLayers">Units in each hidden layer, input side first.</param>
@@ -227,11 +263,38 @@ namespace StatisticalModels
         /// The log-odds of the members' mean probability, computed from their logits so that it never saturates: a confident
         /// member's probability rounds to exactly 1 in double precision, and every confident row would tie.
         /// </summary>
-        public double PredictLogit(double[] features) => LogitOfMeanProbability(Members.Select(m => m.PredictLogit(features)).ToArray());
+        public double PredictLogit(double[] features)
+        {
+            ArgumentNullException.ThrowIfNull(features);
+            if (Members.Count == 0 || features.Length != Members[0].InputCount)
+                return LogitOfMeanProbability(Members.Select(m => m.PredictLogit(features)).ToArray()); // the members report the error
+            int width = Members.Max(m => m.Width);
+            Span<double> first = stackalloc double[width];
+            Span<double> second = stackalloc double[width];
+            Span<double> logits = stackalloc double[Members.Count];
+            for (int m = 0; m < Members.Count; m++)
+                logits[m] = Members[m].Forward(features, first, second);
+            return LogitOfMeanProbability(logits);
+        }
 
         /// <summary>log(mean sigmoid(z)) - log(mean sigmoid(-z)), each a log-sum-exp of log-sigmoids.</summary>
         internal static double LogitOfMeanProbability(IReadOnlyList<double> logits) =>
             LogSumExp(logits.Select(z => -Softplus(-z))) - LogSumExp(logits.Select(z => -Softplus(z)));
+
+        /// <summary><see cref="LogitOfMeanProbability(IReadOnlyList{double})"/> without allocating, summed in the same order.</summary>
+        internal static double LogitOfMeanProbability(ReadOnlySpan<double> logits) => LogSumExpOfLogSigmoid(logits, -1) - LogSumExpOfLogSigmoid(logits, 1);
+
+        /// <summary>log sum exp(-softplus(sign * z)) over the logits.</summary>
+        private static double LogSumExpOfLogSigmoid(ReadOnlySpan<double> logits, double sign)
+        {
+            double max = double.NegativeInfinity;
+            foreach (double z in logits)
+                max = Math.Max(max, -Softplus(sign * z));
+            double sum = 0;
+            foreach (double z in logits)
+                sum += Math.Exp(-Softplus(sign * z) - max);
+            return max + Math.Log(sum);
+        }
 
         private static double Softplus(double t) => Math.Max(t, 0) + Math.Log(1 + Math.Exp(-Math.Abs(t)));
 

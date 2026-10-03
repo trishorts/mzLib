@@ -138,4 +138,24 @@ public class MultilayerPerceptronTests
         Assert.Throws<ArgumentOutOfRangeException>(() => MultilayerPerceptron.Train(x, y, [4], 0, 1));
         Assert.Throws<ArgumentException>(() => MultilayerPerceptron.Train(x, y, [4], 1, 1).Predict([1.0]), "feature count");
     }
+
+    /// <summary>
+    /// Prediction is the hot loop of a DIA rescoring (12 networks x millions of rows x 3 folds), so it must not allocate per
+    /// row; these values, from the allocating version it replaced, pin that it computes exactly the same thing.
+    /// </summary>
+    [Test]
+    public void PredictionsArePinnedExactly()
+    {
+        var r = new Random(3);
+        var x = Enumerable.Range(0, 400).Select(i => Enumerable.Range(0, 7).Select(_ => r.NextDouble() * 4 - 2 + (i % 2 == 0 ? 0.7 : 0)).ToArray()).ToList();
+        var y = Enumerable.Range(0, 400).Select(i => i % 2 == 0).ToList();
+        var ensemble = MultilayerPerceptron.TrainEnsemble(x, y, 3, new[] { 25, 20, 15, 10, 5 }, 2, seed: 11);
+        double[] ensembleLogits = [0.3470434694645611, -0.7743676515512511, 0.9789297911956628, -0.9852972843394292, -0.6267818087740666];
+        double[] memberLogits = [0.7590940525529443, -0.3878021032431866, 0.833344523382401, -0.9729353089861892, -0.5548285858996359];
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.That(ensemble.PredictLogit(x[i]), Is.EqualTo(ensembleLogits[i]), $"ensemble, row {i}");
+            Assert.That(ensemble.Members[0].PredictLogit(x[i]), Is.EqualTo(memberLogits[i]), $"member, row {i}");
+        }
+    }
 }
