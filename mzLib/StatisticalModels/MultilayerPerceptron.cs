@@ -41,6 +41,26 @@ namespace StatisticalModels
             return Forward(features, first, second);
         }
 
+        /// <summary>
+        /// The trained weights laid out by output ([o * inputs + i]) for prediction, built once after training. A 2-D array read
+        /// down its columns cost prediction most of its time; the values and the order of the sums are unchanged.
+        /// </summary>
+        private double[][]? _byOutput;
+
+        private double[][] WeightsByOutput()
+        {
+            var byOutput = new double[_weights.Length][];
+            for (int l = 0; l < _weights.Length; l++)
+            {
+                int inputs = _weights[l].GetLength(0), outputs = _weights[l].GetLength(1);
+                byOutput[l] = new double[inputs * outputs];
+                for (int o = 0; o < outputs; o++)
+                    for (int i = 0; i < inputs; i++)
+                        byOutput[l][o * inputs + i] = _weights[l][i, o];
+            }
+            return byOutput;
+        }
+
         /// <summary>Features the network was trained on.</summary>
         internal int InputCount => _mean.Length;
 
@@ -57,19 +77,22 @@ namespace StatisticalModels
             for (int j = 0; j < width; j++)
                 first[j] = (features[j] - _mean[j]) / _sd[j];
             bool inFirst = true;
+            var byOutput = _byOutput ??= WeightsByOutput();
             for (int l = 0; l < _weights.Length; l++)
             {
-                var w = _weights[l];
+                var w = byOutput[l];
                 var bias = _biases[l];
                 bool last = l == _weights.Length - 1;
                 Span<double> input = (inFirst ? first : second)[..width];
                 Span<double> output = inFirst ? second : first;
-                int outputs = w.GetLength(1);
+                int outputs = _weights[l].GetLength(1);
                 for (int o = 0; o < outputs; o++)
                 {
+                    // Each output's weights are contiguous; the sum runs over the inputs in the same order as before
+                    ReadOnlySpan<double> row = w.AsSpan(o * width, width);
                     double z = bias[o];
                     for (int i = 0; i < width; i++)
-                        z += input[i] * w[i, o];
+                        z += input[i] * row[i];
                     output[o] = last ? z : Math.Tanh(z);
                 }
                 width = outputs;
@@ -127,6 +150,7 @@ namespace StatisticalModels
             }
             var net = new MultilayerPerceptron(mean, sd, weights, biases);
             net.Fit(features, isPositive, epochs, batchSize, learningRate, random);
+            net._byOutput = net.WeightsByOutput(); // prediction's layout, from the final weights
             return net;
         }
 
@@ -185,10 +209,13 @@ namespace StatisticalModels
                         {
                             double[] input = activations[l];
                             for (int o = 0; o < delta.Length; o++)
-                            {
                                 gB[l][o] += delta[o];
-                                for (int i = 0; i < input.Length; i++)
-                                    gW[l][i, o] += input[i] * delta[o];
+                            // Row by row (contiguous); every gradient cell gets the same single addition as before
+                            for (int i = 0; i < input.Length; i++)
+                            {
+                                double x = input[i];
+                                for (int o = 0; o < delta.Length; o++)
+                                    gW[l][i, o] += x * delta[o];
                             }
                             if (l == 0)
                                 break;
@@ -237,14 +264,21 @@ namespace StatisticalModels
 
         private void LayerInto(double[] input, int l, bool last, double[] output)
         {
+            // Row by row through the weights (contiguous), accumulating each output from its bias over the inputs in
+            // increasing order: the same sums, in the same order, as one output at a time
             var w = _weights[l];
+            var bias = _biases[l];
             for (int o = 0; o < output.Length; o++)
+                output[o] = bias[o];
+            for (int i = 0; i < input.Length; i++)
             {
-                double z = _biases[l][o];
-                for (int i = 0; i < input.Length; i++)
-                    z += input[i] * w[i, o];
-                output[o] = last ? z : Math.Tanh(z);
+                double x = input[i];
+                for (int o = 0; o < output.Length; o++)
+                    output[o] += x * w[i, o];
             }
+            if (!last)
+                for (int o = 0; o < output.Length; o++)
+                    output[o] = Math.Tanh(output[o]);
         }
 
         private static double Sigmoid(double z) => 1 / (1 + Math.Exp(-z));
