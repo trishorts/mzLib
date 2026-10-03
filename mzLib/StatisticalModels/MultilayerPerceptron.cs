@@ -153,7 +153,12 @@ namespace StatisticalModels
             const double beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8;
             int step = 0;
             int[] order = Enumerable.Range(0, features.Count).ToArray();
+            // Buffers reused for every row: activations per layer, and the backpropagated error at each layer's output
             var activations = new double[layers + 1][];
+            activations[0] = new double[_mean.Length];
+            for (int l = 0; l < layers; l++)
+                activations[l + 1] = new double[_weights[l].GetLength(1)];
+            var deltas = activations.Select(a => new double[a.Length]).ToArray();
 
             for (int epoch = 0; epoch < epochs; epoch++)
             {
@@ -170,11 +175,12 @@ namespace StatisticalModels
                     for (int r = start; r < end; r++)
                     {
                         int row = order[r];
-                        activations[0] = Standardise(features[row]);
+                        StandardiseInto(features[row], activations[0]);
                         for (int l = 0; l < layers; l++)
-                            activations[l + 1] = Layer(activations[l], l, last: l == layers - 1);
+                            LayerInto(activations[l], l, last: l == layers - 1, activations[l + 1]);
                         // Cross-entropy on the sigmoid output: dLoss/dz = p - y
-                        double[] delta = [Sigmoid(activations[layers][0]) - (isPositive[row] ? 1 : 0)];
+                        double[] delta = deltas[layers];
+                        delta[0] = Sigmoid(activations[layers][0]) - (isPositive[row] ? 1 : 0);
                         for (int l = layers - 1; l >= 0; l--)
                         {
                             double[] input = activations[l];
@@ -186,7 +192,7 @@ namespace StatisticalModels
                             }
                             if (l == 0)
                                 break;
-                            var previous = new double[input.Length];
+                            double[] previous = deltas[l];
                             for (int i = 0; i < input.Length; i++)
                             {
                                 double sum = 0;
@@ -223,19 +229,15 @@ namespace StatisticalModels
             }
         }
 
-        private double[] Standardise(double[] features)
+        private void StandardiseInto(double[] features, double[] x)
         {
-            var x = new double[features.Length];
             for (int j = 0; j < x.Length; j++)
                 x[j] = (features[j] - _mean[j]) / _sd[j];
-            return x;
         }
 
-        /// <summary>One layer's output: tanh for hidden layers, the raw logit for the last.</summary>
-        private double[] Layer(double[] input, int l, bool last)
+        private void LayerInto(double[] input, int l, bool last, double[] output)
         {
             var w = _weights[l];
-            var output = new double[w.GetLength(1)];
             for (int o = 0; o < output.Length; o++)
             {
                 double z = _biases[l][o];
@@ -243,7 +245,6 @@ namespace StatisticalModels
                     z += input[i] * w[i, o];
                 output[o] = last ? z : Math.Tanh(z);
             }
-            return output;
         }
 
         private static double Sigmoid(double z) => 1 / (1 + Math.Exp(-z));
