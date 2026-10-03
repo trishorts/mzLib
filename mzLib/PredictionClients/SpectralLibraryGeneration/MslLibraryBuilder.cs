@@ -75,6 +75,13 @@ namespace PredictionClients.SpectralLibraryGeneration
         /// </summary>
         public Func<IReadOnlyList<Protein>, IReadOnlyList<Protein>>? EntrapmentProteins { get; init; }
 
+        /// <summary>
+        /// Called with every target-side protein (targets and any entrapment). The proteins it returns are the decoys, in
+        /// place of <see cref="MslLibraryBuildParameters.DecoyType"/> reversal; they are digested and predicted as decoys,
+        /// keeping their own accessions. Null makes reversed decoys.
+        /// </summary>
+        public Func<IReadOnlyList<Protein>, IReadOnlyList<Protein>>? DecoyProteins { get; init; }
+
         /// <exception cref="ArgumentNullException">An argument is null.</exception>
         /// <exception cref="ArgumentException">No precursor charge is given.</exception>
         /// <exception cref="ArgumentOutOfRangeException">The prediction chunk size is less than 1.</exception>
@@ -93,7 +100,9 @@ namespace PredictionClients.SpectralLibraryGeneration
             var proteins = targets.ToList();
             if (EntrapmentProteins is not null)
                 proteins.AddRange(EntrapmentProteins(targets));
-            var decoyProteins = DecoyProteinGenerator.GenerateDecoys(proteins, parameters.DecoyType);
+            var decoyProteins = DecoyProteins is not null
+                ? DecoyProteins(proteins).ToList()
+                : DecoyProteinGenerator.GenerateDecoys(proteins, parameters.DecoyType);
 
             var targetPeptides = Digest(proteins, parameters);
             var decoyPeptides = Digest(decoyProteins, parameters);

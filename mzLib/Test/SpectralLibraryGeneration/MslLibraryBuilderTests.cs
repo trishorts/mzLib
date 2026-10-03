@@ -195,6 +195,35 @@ public class MslLibraryBuilderTests
         Assert.That(entries.Any(e => e.IsDecoy && e.ProteinAccession == "DECOY_Random_P1"));
     }
 
+    /// <summary>
+    /// Decoy proteins from the hook replace the reversed ones. It is called with every target-side protein (targets and
+    /// entrapment), so the decoys can be made the same way as paired entrapment: on the paired benchmark, reversed-protein
+    /// decoys were easier to reject than near-isomeric false hits and our q-values under-controlled the FDR.
+    /// </summary>
+    [Test]
+    public void DecoyProteinsFromTheHookReplaceTheReversedOnes()
+    {
+        var proteins = new List<Protein> { new("MPEPTIDEKAAGGLLR", "P1") };
+        IReadOnlyList<Protein>? seen = null;
+        var builder = new MslLibraryBuilder(new CannedKoina().Intensity, new CannedKoina().Irt)
+        {
+            EntrapmentProteins = targets => targets.Select(p => new Protein("MWWYYKFFHHR", "Random_" + p.Accession)).ToList(),
+            DecoyProteins = all =>
+            {
+                seen = all;
+                return all.Select(p => new Protein("MQQNNKSSTTR", "DECOY_" + p.Accession)).ToList();
+            },
+        };
+
+        var entries = builder.Build(proteins, Parameters(), out _);
+
+        Assert.That(seen!.Select(p => p.Accession), Is.EquivalentTo(new[] { "P1", "Random_P1" }));
+        var decoys = entries.Where(e => e.IsDecoy).ToList();
+        Assert.That(decoys, Is.Not.Empty);
+        Assert.That(decoys.All(e => e.BaseSequence is "SSTTR" or "MQQNNK" or "QQNNK"), string.Join(", ", decoys.Select(e => e.BaseSequence).Distinct()));
+        Assert.That(decoys.Select(e => e.ProteinAccession).Distinct(), Is.SupersetOf(new[] { "DECOY_P1|DECOY_Random_P1" }).Or.SupersetOf(new[] { "DECOY_P1" }));
+    }
+
     /// <summary>Koina is called in chunks, so a proteome-scale build never sends one enormous session.</summary>
     [Test]
     public void PredictionsAreRequestedInChunks()
