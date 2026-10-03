@@ -299,20 +299,20 @@ namespace StatisticalModels
             IReadOnlyList<int>? candidateGroups = null)
         {
             int p = features.Count == 0 ? 0 : features[0].Length;
-            var candidates = new List<(int Feature, int Sign, double Separation, double[] Q, bool[] Decoy)>();
             var groups = RowGroups.Of(train, candidateGroups);
-            for (int j = 0; j < p; j++)
+            // Every feature and sign is judged independently, so in parallel, each into its own slot (same order as before)
+            var slots = new (int Feature, int Sign, double Separation, double[] Q, bool[] Decoy)[2 * p];
+            System.Threading.Tasks.Parallel.For(0, 2 * p, k =>
             {
-                foreach (int sign in new[] { 1, -1 })
-                {
-                    // With candidate groups, each feature and sign judges only the group rows it ranks top
-                    int[] rows = TopPerGroup(groups, i => sign * features[i][j]);
-                    bool[] rowDecoy = rows.Select(i => isDecoy[i]).ToArray();
-                    double[] values = rows.Select(i => features[i][j]).ToArray();
-                    double separation = StandardizedMeanDifference(values, rowDecoy);
-                    candidates.Add((j, sign, sign * separation, QValues(values.Select(v => sign * v).ToArray(), rowDecoy), rowDecoy));
-                }
-            }
+                int j = k / 2, sign = k % 2 == 0 ? 1 : -1;
+                // With candidate groups, each feature and sign judges only the group rows it ranks top
+                int[] rows = TopPerGroup(groups, i => sign * features[i][j]);
+                bool[] rowDecoy = rows.Select(i => isDecoy[i]).ToArray();
+                double[] values = rows.Select(i => features[i][j]).ToArray();
+                double separation = StandardizedMeanDifference(values, rowDecoy);
+                slots[k] = (j, sign, sign * separation, QValues(values.Select(v => sign * v).ToArray(), rowDecoy), rowDecoy);
+            });
+            var candidates = slots.ToList();
 
             int PassingOf((int Feature, int Sign, double Separation, double[] Q, bool[] Decoy) k, double c) =>
                 Enumerable.Range(0, k.Q.Length).Count(t => !k.Decoy[t] && k.Q[t] <= c);

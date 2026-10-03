@@ -25,8 +25,20 @@ namespace StatisticalModels
             if (!scores.All(double.IsFinite))
                 throw new ArgumentException("Every score must be finite.", nameof(scores));
 
-            int[] order = Enumerable.Range(0, scores.Count)
-                .OrderByDescending(i => scores[i]).ThenByDescending(i => isDecoy[i]).ThenBy(i => i).ToArray();
+            // Score descending, decoys first at a tie, then index: the same total order as a stable LINQ sort, without its
+            // per-comparison key machinery (the rescorer's seed step computes this for every feature and sign)
+            double[] s = scores.ToArray();
+            bool[] d = isDecoy.ToArray();
+            int[] order = new int[s.Length];
+            for (int i = 0; i < order.Length; i++)
+                order[i] = i;
+            Array.Sort(order, (a, b) =>
+            {
+                int c = s[b].CompareTo(s[a]);
+                if (c != 0) return c;
+                c = d[b].CompareTo(d[a]);
+                return c != 0 ? c : a.CompareTo(b);
+            });
             var ranked = new double[order.Length];
             int decoys = 0, targets = 0;
             for (int k = 0; k < order.Length; k++)
