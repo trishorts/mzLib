@@ -99,7 +99,7 @@ namespace StatisticalModels
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
             RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
             int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1,
-            NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random)
+            NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random, int? normalizationGroups = null)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -120,6 +120,8 @@ namespace StatisticalModels
                 throw new ArgumentOutOfRangeException(nameof(networkEpochs), networkEpochs, "Training needs at least one epoch.");
             if (networkPasses < 1)
                 throw new ArgumentOutOfRangeException(nameof(networkPasses), networkPasses, "The network needs at least one training pass.");
+            if (normalizationGroups is < 1)
+                throw new ArgumentOutOfRangeException(nameof(normalizationGroups), normalizationGroups, "Normalisation needs at least one group.");
             if (maxNetworkTrainingRows is < 2)
                 throw new ArgumentOutOfRangeException(nameof(maxNetworkTrainingRows), maxNetworkTrainingRows, "The network needs at least 2 training rows.");
             if (!(positiveQValue > 0 && positiveQValue < 1))
@@ -218,10 +220,23 @@ namespace StatisticalModels
                 // Every row scored once, in parallel: the folds alone use three cores, and a network ensemble over millions
                 // of rows otherwise costs more than training it
                 var final = new double[n];
-                System.Threading.Tasks.Parallel.For(0, n, i => final[i] = scorer(features[i]));
+                var normalizers = trainGroups;
+                if (normalizationGroups is int sampleSize && trainGroups.Singles.Length + trainGroups.Multiple.Length > sampleSize)
+                {
+                    // A random sample of training groups, seeded by the fold, sets the normalisation: scoring every training
+                    // row only for that was twice the work of scoring the fold's own rows
+                    var sampler = new Random(53 + f + 1000 * randomSeed);
+                    int[] sampledRows = trainGroups.Singles.Select(i => new[] { i }).Concat(trainGroups.Multiple)
+                        .OrderBy(_ => sampler.Next()).Take(sampleSize).SelectMany(g => g).Order().ToArray();
+                    normalizers = RowGroups.Of(sampledRows, candidateGroups);
+                    int[] needed = sampledRows.Concat(test).ToArray();
+                    System.Threading.Tasks.Parallel.ForEach(needed, i => final[i] = scorer(features[i]));
+                }
+                else
+                    System.Threading.Tasks.Parallel.For(0, n, i => final[i] = scorer(features[i]));
 
                 // Normalize on the training rows so that folds are comparable when pooled
-                int[] finalActive = TopPerGroup(trainGroups, i => final[i]);
+                int[] finalActive = TopPerGroup(normalizers, i => final[i]);
                 double[] finalTrain = finalActive.Select(i => final[i]).ToArray();
                 bool[] trainDecoy = finalActive.Select(i => isDecoy[i]).ToArray();
                 double[] finalQ = QValues(finalTrain, trainDecoy);
