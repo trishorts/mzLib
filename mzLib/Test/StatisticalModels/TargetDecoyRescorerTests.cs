@@ -776,4 +776,37 @@ public class TargetDecoyRescorerTests
     }
 
     #endregion
+
+    #region sampled normalisation
+
+    /// <summary>
+    /// Each fold scored every training row only to set its normalisation (the 1% threshold and median decoy), twice the work
+    /// of scoring its own held-out rows. A random sample of training groups estimates both. Within a fold the scores remain
+    /// an affine map of the full normalisation's, so the fold's ranking is unchanged; only the pooling across folds can move.
+    /// </summary>
+    [Test]
+    public void ASampleOfTrainingGroupsNormalisesEachFold()
+    {
+        var (features, isDecoy, groups, _) = Candidates(3000, 3000, 6000, shift: 1.5);
+
+        var full = TargetDecoyRescorer.Score(features, isDecoy, groups);
+        var sampled = TargetDecoyRescorer.Score(features, isDecoy, groups, normalizationGroups: 4000);
+
+        for (int f = 0; f < 3; f++)
+        {
+            int[] rows = Enumerable.Range(0, features.Length).Where(i => full.Folds[i] == f).ToArray();
+            var a = rows.Select(i => full.Scores[i]).ToArray();
+            var b = rows.Select(i => sampled.Scores[i]).ToArray();
+            double slope = (b[1] - b[0]) / (a[1] - a[0]);
+            for (int k = 0; k < rows.Length; k++)
+                Assert.That(b[k], Is.EqualTo(b[0] + slope * (a[k] - a[0])).Within(1e-9 * (1 + Math.Abs(b[k]))), $"fold {f}, row {rows[k]}");
+        }
+        int byFull = TargetsAtQ(full.Scores, isDecoy, 0.01), bySample = TargetsAtQ(sampled.Scores, isDecoy, 0.01);
+        // The threshold is the lowest passing training score, an extreme value: on 4,000 groups its noise moves the pooled count
+        // by several percent either way. A real search samples hundreds of thousands, and the real-data A/B judges it.
+        Assert.That(bySample, Is.EqualTo(byFull).Within(0.1 * byFull));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, normalizationGroups: 0));
+    }
+
+    #endregion
 }
