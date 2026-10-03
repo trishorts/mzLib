@@ -412,6 +412,9 @@ public sealed class MslIndex : IDisposable
 	/// </summary>
 	private long _lruHits;
 
+	/// <summary>Entries in <see cref="_lruCache"/>, kept without taking the dictionary's locks.</summary>
+	private int _lruCount;
+
 	/// <summary>
 	/// Running count of <see cref="GetEntry"/> calls that did not find the requested
 	/// entry in the cache and had to invoke <see cref="_entryLoader"/>. Incremented with
@@ -858,15 +861,20 @@ public sealed class MslIndex : IDisposable
 			return null;
 
 		// Evict the oldest entry when the cache is at capacity
-		if (_lruCache.Count >= _maxBufferSize)
+		// The size is kept in a counter: ConcurrentDictionary.Count takes every bucket lock, which serialised a parallel DIA
+		// search (most lookups miss, so every one asked for the count)
+		if (Volatile.Read(ref _lruCount) >= _maxBufferSize)
 		{
-			if (_lruOrder.TryDequeue(out int oldestKey))
-				_lruCache.TryRemove(oldestKey, out _);
+			if (_lruOrder.TryDequeue(out int oldestKey) && _lruCache.TryRemove(oldestKey, out _))
+				Interlocked.Decrement(ref _lruCount);
 		}
 
 		// Add the new entry to the cache and record its insertion order
 		if (_lruCache.TryAdd(precursorIdx, loaded))
+		{
+			Interlocked.Increment(ref _lruCount);
 			_lruOrder.Enqueue(precursorIdx);
+		}
 
 		return loaded;
 	}
@@ -987,6 +995,7 @@ public sealed class MslIndex : IDisposable
 			return;  // Already disposed
 
 		_lruCache.Clear();
+		Volatile.Write(ref _lruCount, 0);
 
 		// Drain the eviction queue (no finalizer needed; all resources are managed)
 		while (_lruOrder.TryDequeue(out _)) { }
