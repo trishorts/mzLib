@@ -50,8 +50,8 @@ public class MultilayerPerceptronTests
     }
 
     /// <summary>
-    /// Training and prediction to the bit, pinned on the DIA rescorer's architecture: the values were produced by the
-    /// network before its weights moved from 2-D arrays to flat ones, which must change nothing but speed.
+    /// Training and prediction to the bit, pinned on the DIA rescorer's architecture, so that a speed change that should
+    /// change nothing cannot change anything unnoticed. Re-pinned once, deliberately, when tanh became vectorised.
     /// </summary>
     [Test]
     public void TrainingIsPinnedToTheBit()
@@ -89,7 +89,7 @@ public class MultilayerPerceptronTests
         }
     }
 
-    private static readonly long[] PinnedLogitBits = [-4618388307932396066, -4622205833387768178, -4618959286307770040, -4633051758969041453];
+    private static readonly long[] PinnedLogitBits = [-4618388307932396066, -4622205833387768184, -4618959286307770042, -4633051758969041445];
 
     [Test]
     public void TrainingIsDeterministicForASeed()
@@ -183,7 +183,8 @@ public class MultilayerPerceptronTests
 
     /// <summary>
     /// Prediction is the hot loop of a DIA rescoring (12 networks x millions of rows x 3 folds), so it must not allocate per
-    /// row; these values, from the allocating version it replaced, pin that it computes exactly the same thing.
+    /// row; these values, from the allocating version it replaced, pin that it computes the same thing (within 1e-12 since tanh
+    /// became vectorised, which moved the last bits).
     /// </summary>
     [Test]
     public void PredictionsArePinnedExactly()
@@ -196,8 +197,8 @@ public class MultilayerPerceptronTests
         double[] memberLogits = [0.7590940525529443, -0.3878021032431866, 0.833344523382401, -0.9729353089861892, -0.5548285858996359];
         for (int i = 0; i < 5; i++)
         {
-            Assert.That(ensemble.PredictLogit(x[i]), Is.EqualTo(ensembleLogits[i]), $"ensemble, row {i}");
-            Assert.That(ensemble.Members[0].PredictLogit(x[i]), Is.EqualTo(memberLogits[i]), $"member, row {i}");
+            Assert.That(ensemble.PredictLogit(x[i]), Is.EqualTo(ensembleLogits[i]).Within(1e-12), $"ensemble, row {i}");
+            Assert.That(ensemble.Members[0].PredictLogit(x[i]), Is.EqualTo(memberLogits[i]).Within(1e-12), $"member, row {i}");
         }
     }
 }

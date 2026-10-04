@@ -78,7 +78,7 @@ namespace StatisticalModels
                     AddScaled(output, w.AsSpan(i * outputs, outputs), input[i]);
                 if (!last)
                     for (int o = 0; o < outputs; o++)
-                        output[o] = Math.Tanh(output[o]);
+                        output[o] = Tanh(output[o]);
                 width = outputs;
                 inFirst = !inFirst;
             }
@@ -122,10 +122,7 @@ namespace StatisticalModels
                 if (!last)
                     for (int o = 0; o < outputs; o++)
                     {
-                        output[o].CopyTo(lane);
-                        for (int k = 0; k < lane.Length; k++)
-                            lane[k] = Math.Tanh(lane[k]);
-                        output[o] = new Vector<double>(lane);
+                        output[o] = Tanh(output[o]);
                     }
                 width = outputs;
                 inFirst = !inFirst;
@@ -330,7 +327,7 @@ namespace StatisticalModels
                 AddScaled(output, w.AsSpan(i * outputs, outputs), input[i]);
             if (!last)
                 for (int o = 0; o < output.Length; o++)
-                    output[o] = Math.Tanh(output[o]);
+                    output[o] = Tanh(output[o]);
         }
 
         /// <summary>
@@ -349,6 +346,20 @@ namespace StatisticalModels
             for (; o < destination.Length; o++)
                 destination[o] += x * source[o];
         }
+
+        /// <summary>
+        /// tanh as 1 - 2 / (exp(2z) + 1), vectorised (Vector.Exp), with z clamped to +-20, where tanh is 1 to double precision.
+        /// Math.Tanh was most of prediction's time; within about 1e-16 of it. The scalar form is lane 0 of the vector one, so
+        /// training, row-by-row and many-row prediction stay bit-identical to each other.
+        /// </summary>
+        internal static Vector<double> Tanh(Vector<double> z)
+        {
+            var clamped = Vector.Min(Vector.Max(z, new Vector<double>(-20)), new Vector<double>(20));
+            var e = Vector.Exp(clamped + clamped);
+            return Vector<double>.One - new Vector<double>(2) / (e + Vector<double>.One);
+        }
+
+        private static double Tanh(double z) => Tanh(new Vector<double>(z))[0];
 
         private static double Sigmoid(double z) => 1 / (1 + Math.Exp(-z));
     }
