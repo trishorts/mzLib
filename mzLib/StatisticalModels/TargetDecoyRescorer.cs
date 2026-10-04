@@ -151,6 +151,7 @@ namespace StatisticalModels
                 var trainGroups = RowGroups.Of(train, candidateGroups);
                 var seed = BestSingleFeature(features, isDecoy, train, positiveQValue, candidateGroups);
                 Func<double[], double> scorer = x => seed.Sign * x[seed.Feature];
+                MultilayerPerceptronEnsemble? network = null; // the scorer, when it is the network
                 bool trained = false;
                 for (int iteration = 0; iteration < iterations; iteration++)
                 {
@@ -214,6 +215,7 @@ namespace StatisticalModels
                         var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
                             networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);
                         scorer = x => ensemble.PredictLogit(x);
+                        network = ensemble;
                     }
                 }
 
@@ -230,10 +232,28 @@ namespace StatisticalModels
                         .OrderBy(_ => sampler.Next()).Take(sampleSize).SelectMany(g => g).Order().ToArray();
                     normalizers = RowGroups.Of(sampledRows, candidateGroups);
                     int[] needed = sampledRows.Concat(test).ToArray();
-                    System.Threading.Tasks.Parallel.ForEach(needed, i => final[i] = scorer(features[i]));
+                    ScoreRows(needed);
                 }
                 else
-                    System.Threading.Tasks.Parallel.For(0, n, i => final[i] = scorer(features[i]));
+                    ScoreRows(null);
+
+                // The network scores a block of rows at a time (bit-identical to one at a time, several times cheaper)
+                void ScoreRows(int[]? which)
+                {
+                    int count = which?.Length ?? n;
+                    if (network is null)
+                    {
+                        System.Threading.Tasks.Parallel.For(0, count, k => { int i = which?[k] ?? k; final[i] = scorer(features[i]); });
+                        return;
+                    }
+                    System.Threading.Tasks.Parallel.ForEach(System.Collections.Concurrent.Partitioner.Create(0, count, 4096), range =>
+                    {
+                        var block = new int[range.Item2 - range.Item1];
+                        for (int k = 0; k < block.Length; k++)
+                            block[k] = which?[range.Item1 + k] ?? range.Item1 + k;
+                        network.PredictLogits(features, block, final);
+                    });
+                }
 
                 // Normalize on the training rows so that folds are comparable when pooled
                 int[] finalActive = TopPerGroup(normalizers, i => final[i]);

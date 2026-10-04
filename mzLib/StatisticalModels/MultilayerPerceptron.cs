@@ -85,6 +85,54 @@ namespace StatisticalModels
             return (inFirst ? first : second)[0];
         }
 
+        /// <summary>
+        /// <see cref="Forward"/> for <see cref="Vector{T}.Count"/> rows at once, one per lane: each lane gets exactly its row's
+        /// operations in the same order (standardise; per output, the bias then one product and one addition per input in
+        /// increasing order; tanh per lane), so each lane's logit is bit-identical to <see cref="Forward"/>. Narrow layers
+        /// (down to the single output) use whole vectors this way.
+        /// </summary>
+        internal Vector<double> ForwardLanes(IReadOnlyList<double[]> features, ReadOnlySpan<int> rows, Vector<double>[] first, Vector<double>[] second)
+        {
+            Span<double> lane = stackalloc double[Vector<double>.Count];
+            int width = _mean.Length;
+            for (int j = 0; j < width; j++)
+            {
+                for (int k = 0; k < lane.Length; k++)
+                    lane[k] = (features[rows[k]][j] - _mean[j]) / _sd[j];
+                first[j] = new Vector<double>(lane);
+            }
+            bool inFirst = true;
+            for (int l = 0; l < _weights.Length; l++)
+            {
+                var w = _weights[l];
+                var bias = _biases[l];
+                bool last = l == _weights.Length - 1;
+                int outputs = _outputs[l];
+                var input = inFirst ? first : second;
+                var output = inFirst ? second : first;
+                for (int o = 0; o < outputs; o++)
+                    output[o] = new Vector<double>(bias[o]);
+                for (int i = 0; i < width; i++)
+                {
+                    var x = input[i];
+                    int at = i * outputs;
+                    for (int o = 0; o < outputs; o++)
+                        output[o] += x * new Vector<double>(w[at + o]);
+                }
+                if (!last)
+                    for (int o = 0; o < outputs; o++)
+                    {
+                        output[o].CopyTo(lane);
+                        for (int k = 0; k < lane.Length; k++)
+                            lane[k] = Math.Tanh(lane[k]);
+                        output[o] = new Vector<double>(lane);
+                    }
+                width = outputs;
+                inFirst = !inFirst;
+            }
+            return (inFirst ? first : second)[0];
+        }
+
         /// <param name="hiddenLayers">Units in each hidden layer, input side first.</param>
         /// <exception cref="ArgumentNullException">An argument is null.</exception>
         /// <exception cref="ArgumentException">Lengths disagree, rows are ragged or not finite, or a class is missing.</exception>
@@ -331,6 +379,50 @@ namespace StatisticalModels
             for (int m = 0; m < Members.Count; m++)
                 logits[m] = Members[m].Forward(features, first, second);
             return LogitOfMeanProbability(logits);
+        }
+
+        /// <summary>
+        /// <see cref="PredictLogit"/> for each of <paramref name="rows"/> (indices into <paramref name="features"/>), written to
+        /// <paramref name="into"/> at the same index. Bit-identical to calling it row by row, and several times cheaper: rows
+        /// are scored a vector's width at a time (<see cref="MultilayerPerceptron.ForwardLanes"/>), the rest one at a time.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">An argument is null.</exception>
+        /// <exception cref="ArgumentException">A row's feature count differs from training.</exception>
+        public void PredictLogits(IReadOnlyList<double[]> features, IReadOnlyList<int> rows, double[] into)
+        {
+            ArgumentNullException.ThrowIfNull(features);
+            ArgumentNullException.ThrowIfNull(rows);
+            ArgumentNullException.ThrowIfNull(into);
+            int lanes = Vector<double>.Count, members = Members.Count, k = 0;
+            if (Vector.IsHardwareAccelerated && members > 0 && rows.Count >= lanes)
+            {
+                int width = Members.Max(m => m.Width), inputs = Members[0].InputCount;
+                var first = new Vector<double>[width];
+                var second = new Vector<double>[width];
+                Span<int> block = stackalloc int[lanes];
+                Span<double> logits = stackalloc double[lanes * members];
+                for (; k <= rows.Count - lanes; k += lanes)
+                {
+                    bool valid = true;
+                    for (int lane = 0; lane < lanes; lane++)
+                    {
+                        block[lane] = rows[k + lane];
+                        valid &= features[block[lane]] is { } row && row.Length == inputs;
+                    }
+                    if (!valid)
+                        break; // the row-by-row path below reports the bad row
+                    for (int m = 0; m < members; m++)
+                    {
+                        var z = Members[m].ForwardLanes(features, block, first, second);
+                        for (int lane = 0; lane < lanes; lane++)
+                            logits[lane * members + m] = z[lane];
+                    }
+                    for (int lane = 0; lane < lanes; lane++)
+                        into[block[lane]] = LogitOfMeanProbability(logits.Slice(lane * members, members));
+                }
+            }
+            for (; k < rows.Count; k++)
+                into[rows[k]] = PredictLogit(features[rows[k]]);
         }
 
         /// <summary>log(mean sigmoid(z)) - log(mean sigmoid(-z)), each a log-sum-exp of log-sigmoids.</summary>

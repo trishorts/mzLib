@@ -67,6 +67,28 @@ public class MultilayerPerceptronTests
         Assert.That(bits, Is.EqualTo(PinnedLogitBits));
     }
 
+    /// <summary>
+    /// Scoring many rows at once (a row per vector lane) gives each row exactly its one-at-a-time logit, for any count of rows,
+    /// including those left over when the count is not a multiple of the vector width.
+    /// </summary>
+    [Test]
+    public void ManyRowsAtOnceScoreAsOneAtATime()
+    {
+        var (x, y) = Ring(300, 6);
+        var random = new Random(4);
+        var rows = x.Select(v => new[] { v[0], v[1], Gaussian(random), v[0] * v[1], Gaussian(random), 1.0 }).ToList();
+        var ensemble = MultilayerPerceptron.TrainEnsemble(rows, y, members: 3, [25, 20, 15, 10, 5], epochs: 2, seed: 3);
+
+        foreach (int count in new[] { 0, 1, 3, 4, 7, 8, 9, 64, 299 })
+        {
+            int[] which = Enumerable.Range(0, count).Select(k => (k * 37) % rows.Count).ToArray();
+            var batch = new double[rows.Count];
+            ensemble.PredictLogits(rows, which, batch);
+            foreach (int i in which)
+                Assert.That(BitConverter.DoubleToInt64Bits(batch[i]), Is.EqualTo(BitConverter.DoubleToInt64Bits(ensemble.PredictLogit(rows[i]))), $"{count} rows, row {i}");
+        }
+    }
+
     private static readonly long[] PinnedLogitBits = [-4618388307932396066, -4622205833387768178, -4618959286307770040, -4633051758969041453];
 
     [Test]
