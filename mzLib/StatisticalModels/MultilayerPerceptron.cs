@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
 namespace StatisticalModels
 {
@@ -47,26 +48,6 @@ namespace StatisticalModels
             return Forward(features, first, second);
         }
 
-        /// <summary>
-        /// The trained weights laid out by output ([o * inputs + i]) for prediction, built once after training. A 2-D array read
-        /// down its columns cost prediction most of its time; the values and the order of the sums are unchanged.
-        /// </summary>
-        private double[][]? _byOutput;
-
-        private double[][] WeightsByOutput()
-        {
-            var byOutput = new double[_weights.Length][];
-            for (int l = 0; l < _weights.Length; l++)
-            {
-                int inputs = _inputs[l], outputs = _outputs[l];
-                byOutput[l] = new double[inputs * outputs];
-                for (int o = 0; o < outputs; o++)
-                    for (int i = 0; i < inputs; i++)
-                        byOutput[l][o * inputs + i] = _weights[l][i * outputs + o];
-            }
-            return byOutput;
-        }
-
         /// <summary>Features the network was trained on.</summary>
         internal int InputCount => _mean.Length;
 
@@ -83,24 +64,21 @@ namespace StatisticalModels
             for (int j = 0; j < width; j++)
                 first[j] = (features[j] - _mean[j]) / _sd[j];
             bool inFirst = true;
-            var byOutput = _byOutput ??= WeightsByOutput();
             for (int l = 0; l < _weights.Length; l++)
             {
-                var w = byOutput[l];
-                var bias = _biases[l];
+                var w = _weights[l];
                 bool last = l == _weights.Length - 1;
-                Span<double> input = (inFirst ? first : second)[..width];
-                Span<double> output = inFirst ? second : first;
                 int outputs = _outputs[l];
-                for (int o = 0; o < outputs; o++)
-                {
-                    // Each output's weights are contiguous; the sum runs over the inputs in the same order as before
-                    ReadOnlySpan<double> row = w.AsSpan(o * width, width);
-                    double z = bias[o];
-                    for (int i = 0; i < width; i++)
-                        z += input[i] * row[i];
-                    output[o] = last ? z : Math.Tanh(z);
-                }
+                Span<double> input = (inFirst ? first : second)[..width];
+                Span<double> output = (inFirst ? second : first)[..outputs];
+                // Each output from its bias over the inputs in increasing order, as a dot product per output would sum it,
+                // but vectorised across the outputs (AddScaled)
+                _biases[l].AsSpan().CopyTo(output);
+                for (int i = 0; i < width; i++)
+                    AddScaled(output, w.AsSpan(i * outputs, outputs), input[i]);
+                if (!last)
+                    for (int o = 0; o < outputs; o++)
+                        output[o] = Math.Tanh(output[o]);
                 width = outputs;
                 inFirst = !inFirst;
             }
@@ -155,9 +133,7 @@ namespace StatisticalModels
                 biases[l] = new double[sizes[l + 1]];
             }
             var net = new MultilayerPerceptron(mean, sd, weights, sizes[..^1], sizes[1..], biases);
-            net.Fit(features, isPositive, epochs, batchSize, learningRate, random);
-            net._byOutput = net.WeightsByOutput(); // prediction's layout, from the final weights
-            return net;
+            net.Fit(features, isPositive, epochs, batchSize, learningRate, random);            return net;
         }
 
         /// <summary>An ensemble of <paramref name="members"/> networks, each seeded differently; it predicts their mean.</summary>
@@ -221,10 +197,7 @@ namespace StatisticalModels
                             // Row by row (contiguous); every gradient cell gets the same single addition as before
                             for (int i = 0; i < input.Length; i++)
                             {
-                                double x = input[i];
-                                int at = i * outputs;
-                                for (int o = 0; o < outputs; o++)
-                                    g[at + o] += x * delta[o];
+                                AddScaled(g.AsSpan(i * outputs, outputs), delta, input[i]);
                             }
                             if (l == 0)
                                 break;
@@ -248,7 +221,30 @@ namespace StatisticalModels
                     {
                         // Cell by cell in the same (i, o) order as before; the flat index is i * outputs + o
                         double[] wl = _weights[l], gl = gW[l], ml = mW[l], vl = vW[l];
-                        for (int k = 0; k < wl.Length; k++)
+                        int k = 0;
+                        if (Vector.IsHardwareAccelerated)
+                        {
+                            // The same operations per cell, in the same order, Vector<double>.Count cells at a time
+                            var vn = new Vector<double>(n);
+                            var vBeta1 = new Vector<double>(beta1);
+                            var vOneMinusBeta1 = new Vector<double>(1 - beta1);
+                            var vBeta2 = new Vector<double>(beta2);
+                            var vOneMinusBeta2 = new Vector<double>(1 - beta2);
+                            var vRate = new Vector<double>(learningRate);
+                            var vCorrection1 = new Vector<double>(correction1);
+                            var vCorrection2 = new Vector<double>(correction2);
+                            var vEpsilon = new Vector<double>(epsilon);
+                            for (; k <= wl.Length - Vector<double>.Count; k += Vector<double>.Count)
+                            {
+                                var g = new Vector<double>(gl, k) / vn;
+                                var m = vBeta1 * new Vector<double>(ml, k) + vOneMinusBeta1 * g;
+                                var v = vBeta2 * new Vector<double>(vl, k) + vOneMinusBeta2 * g * g;
+                                m.CopyTo(ml, k);
+                                v.CopyTo(vl, k);
+                                (new Vector<double>(wl, k) - vRate * (m / vCorrection1) / (Vector.SquareRoot(v / vCorrection2) + vEpsilon)).CopyTo(wl, k);
+                            }
+                        }
+                        for (; k < wl.Length; k++)
                         {
                             double g = gl[k] / n;
                             ml[k] = beta1 * ml[k] + (1 - beta1) * g;
@@ -283,15 +279,27 @@ namespace StatisticalModels
                 output[o] = bias[o];
             int outputs = output.Length;
             for (int i = 0; i < input.Length; i++)
-            {
-                double x = input[i];
-                int at = i * outputs;
-                for (int o = 0; o < outputs; o++)
-                    output[o] += x * w[at + o];
-            }
+                AddScaled(output, w.AsSpan(i * outputs, outputs), input[i]);
             if (!last)
                 for (int o = 0; o < output.Length; o++)
                     output[o] = Math.Tanh(output[o]);
+        }
+
+        /// <summary>
+        /// destination[o] += x * source[o], vectorised: each cell gets the same one product and one addition as the scalar
+        /// loop (no fused multiply-add), so the result is bit-identical.
+        /// </summary>
+        private static void AddScaled(Span<double> destination, ReadOnlySpan<double> source, double x)
+        {
+            int o = 0;
+            if (Vector.IsHardwareAccelerated)
+            {
+                var vx = new Vector<double>(x);
+                for (; o <= destination.Length - Vector<double>.Count; o += Vector<double>.Count)
+                    (new Vector<double>(destination[o..]) + new Vector<double>(source[o..]) * vx).CopyTo(destination[o..]);
+            }
+            for (; o < destination.Length; o++)
+                destination[o] += x * source[o];
         }
 
         private static double Sigmoid(double z) => 1 / (1 + Math.Exp(-z));
