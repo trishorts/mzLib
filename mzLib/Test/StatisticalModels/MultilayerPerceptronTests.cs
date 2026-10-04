@@ -49,6 +49,26 @@ public class MultilayerPerceptronTests
         Assert.That(Accuracy(v => line.Score(v) > 0 ? 1 : 0, tx, ty), Is.LessThan(0.75), "a line cannot do it");
     }
 
+    /// <summary>
+    /// Training and prediction to the bit, pinned on the DIA rescorer's architecture: the values were produced by the
+    /// network before its weights moved from 2-D arrays to flat ones, which must change nothing but speed.
+    /// </summary>
+    [Test]
+    public void TrainingIsPinnedToTheBit()
+    {
+        var (x, y) = Ring(400, 5);
+        var random = new Random(9);
+        var rows = x.Select(v => new[] { v[0], v[1], Gaussian(random), v[0] * v[1], Gaussian(random), 1.0 }).ToList();
+
+        var net = MultilayerPerceptron.Train(rows, y, [25, 20, 15, 10, 5], epochs: 3, seed: 13);
+
+        long[] bits = rows.Take(4).Select(r => BitConverter.DoubleToInt64Bits(net.PredictLogit(r))).ToArray();
+        TestContext.Out.WriteLine("pinned: " + string.Join(", ", bits));
+        Assert.That(bits, Is.EqualTo(PinnedLogitBits));
+    }
+
+    private static readonly long[] PinnedLogitBits = [-4618388307932396066, -4622205833387768178, -4618959286307770040, -4633051758969041453];
+
     [Test]
     public void TrainingIsDeterministicForASeed()
     {

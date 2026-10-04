@@ -13,14 +13,20 @@ namespace StatisticalModels
     {
         private readonly double[] _mean;
         private readonly double[] _sd;
-        private readonly double[][,] _weights; // layer l: [inputs, outputs]
+        // Layer l: [inputs, outputs] row-major in one flat array (element (i, o) at i * outputs + o); a 2-D array's
+        // two-index bounds checks were most of training's time
+        private readonly double[][] _weights;
+        private readonly int[] _inputs;
+        private readonly int[] _outputs;
         private readonly double[][] _biases;
 
-        private MultilayerPerceptron(double[] mean, double[] sd, double[][,] weights, double[][] biases)
+        private MultilayerPerceptron(double[] mean, double[] sd, double[][] weights, int[] inputs, int[] outputs, double[][] biases)
         {
             _mean = mean;
             _sd = sd;
             _weights = weights;
+            _inputs = inputs;
+            _outputs = outputs;
             _biases = biases;
         }
 
@@ -52,11 +58,11 @@ namespace StatisticalModels
             var byOutput = new double[_weights.Length][];
             for (int l = 0; l < _weights.Length; l++)
             {
-                int inputs = _weights[l].GetLength(0), outputs = _weights[l].GetLength(1);
+                int inputs = _inputs[l], outputs = _outputs[l];
                 byOutput[l] = new double[inputs * outputs];
                 for (int o = 0; o < outputs; o++)
                     for (int i = 0; i < inputs; i++)
-                        byOutput[l][o * inputs + i] = _weights[l][i, o];
+                        byOutput[l][o * inputs + i] = _weights[l][i * outputs + o];
             }
             return byOutput;
         }
@@ -65,7 +71,7 @@ namespace StatisticalModels
         internal int InputCount => _mean.Length;
 
         /// <summary>The widest layer, inputs included: the size of each buffer <see cref="Forward"/> needs.</summary>
-        internal int Width => Math.Max(_mean.Length, _weights.Max(w => w.GetLength(1)));
+        internal int Width => Math.Max(_mean.Length, _outputs.Max());
 
         /// <summary>
         /// <see cref="PredictLogit(double[])"/> on two caller buffers of at least <see cref="Width"/>, allocating nothing:
@@ -85,7 +91,7 @@ namespace StatisticalModels
                 bool last = l == _weights.Length - 1;
                 Span<double> input = (inFirst ? first : second)[..width];
                 Span<double> output = inFirst ? second : first;
-                int outputs = _weights[l].GetLength(1);
+                int outputs = _outputs[l];
                 for (int o = 0; o < outputs; o++)
                 {
                     // Each output's weights are contiguous; the sum runs over the inputs in the same order as before
@@ -137,18 +143,18 @@ namespace StatisticalModels
 
             var random = new Random(seed);
             int[] sizes = [p, .. hiddenLayers, 1];
-            var weights = new double[sizes.Length - 1][,];
+            var weights = new double[sizes.Length - 1][];
             var biases = new double[sizes.Length - 1][];
             for (int l = 0; l < weights.Length; l++)
             {
                 double limit = Math.Sqrt(6.0 / (sizes[l] + sizes[l + 1])); // Xavier/Glorot uniform
-                weights[l] = new double[sizes[l], sizes[l + 1]];
+                weights[l] = new double[sizes[l] * sizes[l + 1]];
                 for (int i = 0; i < sizes[l]; i++)
                     for (int o = 0; o < sizes[l + 1]; o++)
-                        weights[l][i, o] = (2 * random.NextDouble() - 1) * limit;
+                        weights[l][i * sizes[l + 1] + o] = (2 * random.NextDouble() - 1) * limit;
                 biases[l] = new double[sizes[l + 1]];
             }
-            var net = new MultilayerPerceptron(mean, sd, weights, biases);
+            var net = new MultilayerPerceptron(mean, sd, weights, sizes[..^1], sizes[1..], biases);
             net.Fit(features, isPositive, epochs, batchSize, learningRate, random);
             net._byOutput = net.WeightsByOutput(); // prediction's layout, from the final weights
             return net;
@@ -168,11 +174,11 @@ namespace StatisticalModels
         private void Fit(IReadOnlyList<double[]> features, IReadOnlyList<bool> isPositive, int epochs, int batchSize, double learningRate, Random random)
         {
             int layers = _weights.Length;
-            var mW = _weights.Select(w => new double[w.GetLength(0), w.GetLength(1)]).ToArray();
-            var vW = _weights.Select(w => new double[w.GetLength(0), w.GetLength(1)]).ToArray();
+            var mW = _weights.Select(w => new double[w.Length]).ToArray();
+            var vW = _weights.Select(w => new double[w.Length]).ToArray();
             var mB = _biases.Select(b => new double[b.Length]).ToArray();
             var vB = _biases.Select(b => new double[b.Length]).ToArray();
-            var gW = _weights.Select(w => new double[w.GetLength(0), w.GetLength(1)]).ToArray();
+            var gW = _weights.Select(w => new double[w.Length]).ToArray();
             var gB = _biases.Select(b => new double[b.Length]).ToArray();
             const double beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8;
             int step = 0;
@@ -181,7 +187,7 @@ namespace StatisticalModels
             var activations = new double[layers + 1][];
             activations[0] = new double[_mean.Length];
             for (int l = 0; l < layers; l++)
-                activations[l + 1] = new double[_weights[l].GetLength(1)];
+                activations[l + 1] = new double[_outputs[l]];
             var deltas = activations.Select(a => new double[a.Length]).ToArray();
 
             for (int epoch = 0; epoch < epochs; epoch++)
@@ -208,14 +214,17 @@ namespace StatisticalModels
                         for (int l = layers - 1; l >= 0; l--)
                         {
                             double[] input = activations[l];
+                            double[] g = gW[l], w = _weights[l];
+                            int outputs = delta.Length;
                             for (int o = 0; o < delta.Length; o++)
                                 gB[l][o] += delta[o];
                             // Row by row (contiguous); every gradient cell gets the same single addition as before
                             for (int i = 0; i < input.Length; i++)
                             {
                                 double x = input[i];
-                                for (int o = 0; o < delta.Length; o++)
-                                    gW[l][i, o] += x * delta[o];
+                                int at = i * outputs;
+                                for (int o = 0; o < outputs; o++)
+                                    g[at + o] += x * delta[o];
                             }
                             if (l == 0)
                                 break;
@@ -223,8 +232,9 @@ namespace StatisticalModels
                             for (int i = 0; i < input.Length; i++)
                             {
                                 double sum = 0;
-                                for (int o = 0; o < delta.Length; o++)
-                                    sum += _weights[l][i, o] * delta[o];
+                                int at = i * outputs;
+                                for (int o = 0; o < outputs; o++)
+                                    sum += w[at + o] * delta[o];
                                 previous[i] = sum * (1 - input[i] * input[i]); // tanh'
                             }
                             delta = previous;
@@ -236,14 +246,15 @@ namespace StatisticalModels
                     double correction1 = 1 - Math.Pow(beta1, step), correction2 = 1 - Math.Pow(beta2, step);
                     for (int l = 0; l < layers; l++)
                     {
-                        for (int i = 0; i < _weights[l].GetLength(0); i++)
-                            for (int o = 0; o < _weights[l].GetLength(1); o++)
-                            {
-                                double g = gW[l][i, o] / n;
-                                mW[l][i, o] = beta1 * mW[l][i, o] + (1 - beta1) * g;
-                                vW[l][i, o] = beta2 * vW[l][i, o] + (1 - beta2) * g * g;
-                                _weights[l][i, o] -= learningRate * (mW[l][i, o] / correction1) / (Math.Sqrt(vW[l][i, o] / correction2) + epsilon);
-                            }
+                        // Cell by cell in the same (i, o) order as before; the flat index is i * outputs + o
+                        double[] wl = _weights[l], gl = gW[l], ml = mW[l], vl = vW[l];
+                        for (int k = 0; k < wl.Length; k++)
+                        {
+                            double g = gl[k] / n;
+                            ml[k] = beta1 * ml[k] + (1 - beta1) * g;
+                            vl[k] = beta2 * vl[k] + (1 - beta2) * g * g;
+                            wl[k] -= learningRate * (ml[k] / correction1) / (Math.Sqrt(vl[k] / correction2) + epsilon);
+                        }
                         for (int o = 0; o < _biases[l].Length; o++)
                         {
                             double g = gB[l][o] / n;
@@ -270,11 +281,13 @@ namespace StatisticalModels
             var bias = _biases[l];
             for (int o = 0; o < output.Length; o++)
                 output[o] = bias[o];
+            int outputs = output.Length;
             for (int i = 0; i < input.Length; i++)
             {
                 double x = input[i];
-                for (int o = 0; o < output.Length; o++)
-                    output[o] += x * w[i, o];
+                int at = i * outputs;
+                for (int o = 0; o < outputs; o++)
+                    output[o] += x * w[at + o];
             }
             if (!last)
                 for (int o = 0; o < output.Length; o++)
