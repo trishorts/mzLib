@@ -674,6 +674,67 @@ namespace Test.DatabaseTests.VariantCorpus
                     "TIDE", "T[Biological:Phosphorylation on T]IDE"
                 },
                 Processing: "chain@4-7");
+
+            // ---- L2 processing: a variant that CHANGES a cut-site residue loses the cut (invariant 13) -----------
+            // A processing boundary is a cut made by an enzyme that recognizes the residues there. If the variant
+            // changes the residue a product begins or ends on, the cut is lost and the variant proteoform carries NO
+            // product for it (the consensus keeps its own). Ends that are not cuts (residue 1, the protein's last
+            // residue) are exempt. Positional simplification: only the boundary residue counts (D9 is the upgrade).
+
+            // P07 — T4->V changes the residue chain [4,7] BEGINS on: the cut before residue 4 is lost, so the
+            // variant has no chain. Consensus: PEPTIDE + chain TIDE. Variant: PEPVIDE only. 3 forms.
+            yield return new CorpusCase(
+                Id: "P07", Layer: "L2-proc", Tests: "sub-on-chain-begin-loses-cut",
+                Base: "PEPTIDE", Mods: "-", Variants: "OP=T VAR=V POS=4 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 3, Verdict: "applied",
+                Reason: "Chain [4,7] begins on T4; T4->V changes that residue, so the cut before it is lost and the variant proteoform carries no chain (invariant 13). The consensus keeps TIDE.",
+                ExpectedForms: new[] { "PEPTIDE", "TIDE", "PEPVIDE" },
+                Processing: "chain@4-7");
+
+            // P08 — I5->V changes the residue chain [3,5] ENDS on: the cut after residue 5 is lost. Consensus:
+            // PEPTIDE + chain PTI. Variant: PEPTVDE only. 3 forms.
+            yield return new CorpusCase(
+                Id: "P08", Layer: "L2-proc", Tests: "sub-on-chain-end-loses-cut",
+                Base: "PEPTIDE", Mods: "-", Variants: "OP=I VAR=V POS=5 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 3, Verdict: "applied",
+                Reason: "Chain [3,5] ends on I5; I5->V changes that residue, so the cut after it is lost and the variant proteoform carries no chain (invariant 13). The consensus keeps PTI.",
+                ExpectedForms: new[] { "PEPTIDE", "PTI", "PEPTVDE" },
+                Processing: "chain@3-5");
+
+            // P09 — deleting T4 removes the residue chain [4,7] begins on: the cut is lost with it. Consensus:
+            // PEPTIDE + chain TIDE. Variant: PEPIDE only. 3 forms.
+            yield return new CorpusCase(
+                Id: "P09", Layer: "L2-proc", Tests: "del-of-chain-begin-loses-cut",
+                Base: "PEPTIDE", Mods: "-", Variants: "OP=T POS=4 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 3, Verdict: "applied",
+                Reason: "Chain [4,7] begins on T4; deleting T4 removes the cut-site residue, so the variant proteoform carries no chain (invariant 13). The chain does NOT slide to the next residue.",
+                ExpectedForms: new[] { "PEPTIDE", "TIDE", "PEPIDE" },
+                Processing: "chain@4-7");
+
+            // P10 — E7->A changes the residue chain [4,7] ends on, but residue 7 is the protein's LAST residue: there
+            // is no cut there to lose, so the chain survives as TIDA. 4 forms.
+            yield return new CorpusCase(
+                Id: "P10", Layer: "L2-proc", Tests: "sub-on-protein-c-term-keeps-chain",
+                Base: "PEPTIDE", Mods: "-", Variants: "OP=E VAR=A POS=7 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 4, Verdict: "applied",
+                Reason: "Chain [4,7] ends on the protein's C-terminus, which is not a cut site, so changing E7 loses nothing: the variant keeps the chain as TIDA (invariant 13 exemption).",
+                ExpectedForms: new[] { "PEPTIDE", "TIDE", "PEPTIDA", "TIDA" },
+                Processing: "chain@4-7");
+
+            // P11 — I5->V changes a residue INSIDE chain [3,6], not on either boundary: both cuts survive and the
+            // chain carries the new residue (PTVD). Contrast with P08. 4 forms.
+            yield return new CorpusCase(
+                Id: "P11", Layer: "L2-proc", Tests: "sub-inside-chain-keeps-chain",
+                Base: "PEPTIDE", Mods: "-", Variants: "OP=I VAR=V POS=5 SRC=uniprot", Protease: "top-down",
+                MaxIsoforms: 1024, MaxMods: 2,
+                ExpectedCount: 4, Verdict: "applied",
+                Reason: "I5->V lies inside chain [3,6], away from both cut sites, so the chain survives with the new residue (PTVD). Invariant 13 looks only at the boundary residues (positional; D9 would widen this to the recognition window).",
+                ExpectedForms: new[] { "PEPTIDE", "PTID", "PEPTVDE", "PTVD" },
+                Processing: "chain@3-6");
         }
 
         private static IEnumerable<TestCaseData> Cases()
