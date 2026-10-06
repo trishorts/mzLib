@@ -347,6 +347,40 @@ public class TargetDecoyRescorerTests
     }
 
     /// <summary>
+    /// The network's hidden layers can be chosen (DIA-NN 2020's 25-20-15-10-5 by default): another architecture gives other
+    /// scores, a wider one still finds non-linear signal a line misses, and an empty or zero-unit layer list is refused.
+    /// </summary>
+    [Test]
+    public void TheNetworkArchitectureCanBeChosen()
+    {
+        var random = new Random(21);
+        var features = new List<double[]>();
+        var isDecoy = new List<bool>();
+        var groups = new List<string>();
+        void Add(bool decoy, bool real, int i)
+        {
+            double spread = real ? 3.0 : 1.0;
+            features.Add([spread * Gaussian(random), spread * Gaussian(random), Gaussian(random)]);
+            isDecoy.Add(decoy);
+            groups.Add($"{(decoy ? "D" : "T")}{i}");
+        }
+        for (int i = 0; i < 2000; i++) Add(false, true, i);
+        for (int i = 0; i < 2000; i++) Add(false, false, 2000 + i);
+        for (int i = 0; i < 4000; i++) Add(true, false, i);
+        bool[] decoys = isDecoy.ToArray();
+
+        var standard = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble, networkMembers: 3);
+        var wide = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15, model: RescoreModel.NeuralNetworkEnsemble, networkMembers: 3,
+            networkLayers: [64, 32, 16]);
+        var linear = TargetDecoyRescorer.Score(features, isDecoy, groups, positiveQValue: 0.15);
+
+        Assert.That(wide.Scores, Is.Not.EqualTo(standard.Scores));
+        Assert.That(TargetsAtQ(wide.Scores, decoys, 0.01), Is.GreaterThan(TargetsAtQ(linear.Scores, decoys, 0.01) + 200));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble, networkLayers: []));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, isDecoy, groups, model: RescoreModel.NeuralNetworkEnsemble, networkLayers: [10, 0]));
+    }
+
+    /// <summary>
     /// True targets that differ from decoys only non-linearly (a larger spread on two features, the same mean): the network
     /// ensemble finds them, a line cannot. It trains only on each fold's training rows.
     /// </summary>

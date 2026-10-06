@@ -82,6 +82,9 @@ namespace StatisticalModels
 
     public static class TargetDecoyRescorer
     {
+        /// <param name="networkLayers">
+        /// Network model only: units in each hidden layer, input side first. DIA-NN 2020's 25-20-15-10-5 when null.
+        /// </param>
         /// <param name="networkPasses">
         /// Network model only: training passes. The first trains on each candidate group's top row by the linear model;
         /// each later pass re-picks the top rows with the previous network and trains a new one, as DIA-NN trains twice.
@@ -99,7 +102,8 @@ namespace StatisticalModels
             int folds = 3, int iterations = 3, double positiveQValue = 0.01, IReadOnlyList<int>? candidateGroups = null,
             RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
             int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1,
-            NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random, int? normalizationGroups = null)
+            NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random, int? normalizationGroups = null,
+            IReadOnlyList<int>? networkLayers = null)
         {
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
@@ -120,6 +124,8 @@ namespace StatisticalModels
                 throw new ArgumentOutOfRangeException(nameof(networkEpochs), networkEpochs, "Training needs at least one epoch.");
             if (networkPasses < 1)
                 throw new ArgumentOutOfRangeException(nameof(networkPasses), networkPasses, "The network needs at least one training pass.");
+            if (networkLayers is not null && (networkLayers.Count == 0 || networkLayers.Any(units => units < 1)))
+                throw new ArgumentOutOfRangeException(nameof(networkLayers), "The network needs at least one hidden layer, each of at least one unit.");
             if (normalizationGroups is < 1)
                 throw new ArgumentOutOfRangeException(nameof(normalizationGroups), normalizationGroups, "Normalisation needs at least one group.");
             if (maxNetworkTrainingRows is < 2)
@@ -213,7 +219,7 @@ namespace StatisticalModels
                             rows = rows.OrderBy(_ => sampler.Next()).Take(cap2).Order().ToArray();
                         }
                         var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
-                            networkMembers, NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);
+                            networkMembers, networkLayers ?? NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);
                         scorer = x => ensemble.PredictLogit(x);
                         network = ensemble;
                     }
