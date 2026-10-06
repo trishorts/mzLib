@@ -347,6 +347,32 @@ public class TargetDecoyRescorerTests
     }
 
     /// <summary>
+    /// The confident training sample, with a positive q cutoff: only targets that pass it (by the linear ranking) are positives,
+    /// at most half the cap, and as many of the top-ranked decoys. Without a cutoff it is the top half-cap of each, as before.
+    /// If no target passes, the sample falls back to that.
+    /// </summary>
+    [Test]
+    public void TheConfidentSampleCanKeepOnlyTargetsThatPassACutoff()
+    {
+        int[] ranked = Enumerable.Range(0, 12).ToArray();
+        double[] scores = ranked.Select(i => 12.0 - i).ToArray();
+        bool[] decoy = [false, false, false, true, false, true, false, true, true, false, true, false];
+        double[] q = TargetDecoyRescorer.QValues(scores, decoy);
+        int[] passing = ranked.Where(i => !decoy[i] && q[i] <= 0.4).ToArray();
+        Assert.That(passing, Is.Not.Empty.And.Length.LessThan(ranked.Count(i => !decoy[i])), "the cutoff must bite in this example");
+
+        int[] withCutoff = TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: 0.4);
+        int[] withoutCutoff = TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: null);
+        int[] noneCanPass = TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: 1e-9);
+
+        Assert.That(withCutoff.Where(i => !decoy[i]), Is.EquivalentTo(passing.Take(5)));
+        Assert.That(withCutoff.Where(i => decoy[i]), Is.EquivalentTo(ranked.Where(i => decoy[i]).Take(Math.Min(5, passing.Length))));
+        Assert.That(withoutCutoff, Is.EquivalentTo(ranked.Where(i => !decoy[i]).Take(5).Concat(ranked.Where(i => decoy[i]).Take(5))));
+        Assert.That(withCutoff, Is.Ordered);
+        Assert.That(noneCanPass, Is.EquivalentTo(withoutCutoff), "no passing target falls back to the plain confident sample");
+    }
+
+    /// <summary>
     /// The network's hidden layers can be chosen (DIA-NN 2020's 25-20-15-10-5 by default): another architecture gives other
     /// scores, a wider one still finds non-linear signal a line misses, and an empty or zero-unit layer list is refused.
     /// </summary>
