@@ -385,7 +385,7 @@ public class TargetDecoyRescorerTests
         // Targets dominate the top of the ranking, as real ones lift them
         bool[] decoy = ranked.Select(i => i >= 6 && i % 2 == 1).ToArray();
 
-        int[] pooled = TargetDecoyRescorer.PooledTrainingRows(ranked, cap: 10);
+        int[] pooled = TargetDecoyRescorer.PooledTrainingRows(ranked, decoy, cap: 10);
         Assert.That(pooled, Is.EqualTo(ranked.Take(10).Order()));
         Assert.That(pooled.Count(i => !decoy[i]), Is.GreaterThan(5), "more targets than half when targets lead the ranking");
 
@@ -393,6 +393,27 @@ public class TargetDecoyRescorerTests
         var features = ranked.Select(i => new[] { random.NextDouble() + (decoy[i] ? 0 : 0.5), random.NextDouble() }).ToList();
         var keys = ranked.Select(i => i.ToString()).ToList();
         var result = TargetDecoyRescorer.Score(features, decoy, keys, model: RescoreModel.NeuralNetworkEnsemble, maxNetworkTrainingRows: 10,
+            networkTrainingSample: NetworkTrainingSample.ConfidentPooled, networkMembers: 2, networkEpochs: 2);
+        Assert.That(result.Scores, Has.All.Matches<double>(double.IsFinite));
+    }
+
+    /// <summary>
+    /// When the top rows of the ranking are all one label the network cannot train on them, so the pooled sample falls back
+    /// to the top targets and the top decoys, half the cap each.
+    /// </summary>
+    [Test]
+    public void ThePooledSampleWithOneLabelFallsBackToEqualHalves()
+    {
+        int[] ranked = Enumerable.Range(0, 20).ToArray();
+        bool[] decoy = ranked.Select(i => i >= 12).ToArray();
+
+        int[] pooled = TargetDecoyRescorer.PooledTrainingRows(ranked, decoy, cap: 10);
+        Assert.That(pooled, Is.EqualTo(new[] { 0, 1, 2, 3, 4, 12, 13, 14, 15, 16 }));
+
+        var random = new Random(5);
+        var features = ranked.Select(i => new[] { random.NextDouble() + (decoy[i] ? 0 : 2), random.NextDouble() }).ToList();
+        var keys = ranked.Select(i => i.ToString()).ToList();
+        var result = TargetDecoyRescorer.Score(features, decoy, keys, model: RescoreModel.NeuralNetworkEnsemble, maxNetworkTrainingRows: 4,
             networkTrainingSample: NetworkTrainingSample.ConfidentPooled, networkMembers: 2, networkEpochs: 2);
         Assert.That(result.Scores, Has.All.Matches<double>(double.IsFinite));
     }

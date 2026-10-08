@@ -222,7 +222,7 @@ namespace StatisticalModels
                         if (maxNetworkTrainingRows is int pooledCap && rows.Length > pooledCap && networkTrainingSample == NetworkTrainingSample.ConfidentPooled)
                         {
                             // One threshold for both labels: equal halves leave a band where only decoys train
-                            rows = PooledTrainingRows(rows.OrderByDescending(pick).ThenBy(i => i).ToArray(), pooledCap);
+                            rows = PooledTrainingRows(rows.OrderByDescending(pick).ThenBy(i => i).ToArray(), isDecoy, pooledCap);
                         }
                         else if (maxNetworkTrainingRows is int cap && rows.Length > cap && networkTrainingSample == NetworkTrainingSample.Confident)
                         {
@@ -453,8 +453,17 @@ namespace StatisticalModels
         /// <summary>Target-decoy q-values in input order, from the shared <see cref="TargetDecoyQValues"/>.</summary>
         internal static double[] QValues(double[] scores, bool[] isDecoy) => TargetDecoyQValues.Compute(scores, isDecoy);
 
-        /// <summary>The pooled confident sample: the first <paramref name="cap"/> of <paramref name="ranked"/> (best first), in ascending row order.</summary>
-        internal static int[] PooledTrainingRows(int[] ranked, int cap) => ranked.Take(cap).Order().ToArray();
+        /// <summary>
+        /// The pooled confident sample: the first <paramref name="cap"/> of <paramref name="ranked"/> (best first), in ascending
+        /// row order. If those are all one label, the network cannot train on them, so the top targets and decoys, half each.
+        /// </summary>
+        internal static int[] PooledTrainingRows(int[] ranked, IReadOnlyList<bool> isDecoy, int cap)
+        {
+            int[] top = ranked.Take(cap).ToArray();
+            if (top.Any(i => isDecoy[i]) && top.Any(i => !isDecoy[i]))
+                return top.Order().ToArray();
+            return ranked.Where(i => !isDecoy[i]).Take(cap / 2).Concat(ranked.Where(i => isDecoy[i]).Take(cap - cap / 2)).Order().ToArray();
+        }
 
         /// <summary>
         /// The confident training sample from rows <paramref name="ranked"/> best first (their scores in
