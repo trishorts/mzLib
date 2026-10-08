@@ -86,6 +86,10 @@ namespace StatisticalModels
         /// Network model, confident sample only: positives are the targets passing this q-value in the linear ranking (with as
         /// many top decoys) rather than the top half-cap of targets whatever their q. Null keeps the latter.
         /// </param>
+        /// <param name="networkTargetFraction">
+        /// Network model, confident sample only: the share of the cap taken from the top targets, the rest from the top decoys.
+        /// One half by default; strictly between 0 and 1.
+        /// </param>
         /// <param name="networkLayers">
         /// Network model only: units in each hidden layer, input side first. DIA-NN 2020's 25-20-15-10-5 when null.
         /// </param>
@@ -107,8 +111,10 @@ namespace StatisticalModels
             RescoreModel model = RescoreModel.LinearDiscriminant, int? maxNetworkTrainingRows = null, int randomSeed = 0,
             int networkMembers = NetworkMembers, int networkEpochs = NetworkEpochs, int networkPasses = 1,
             NetworkTrainingSample networkTrainingSample = NetworkTrainingSample.Random, int? normalizationGroups = null,
-            IReadOnlyList<int>? networkLayers = null, double? networkPositiveQValue = null)
+            IReadOnlyList<int>? networkLayers = null, double? networkPositiveQValue = null, double networkTargetFraction = 0.5)
         {
+            if (!(networkTargetFraction > 0 && networkTargetFraction < 1))
+                throw new ArgumentOutOfRangeException(nameof(networkTargetFraction), "The target share must lie strictly between 0 and 1.");
             ArgumentNullException.ThrowIfNull(features);
             ArgumentNullException.ThrowIfNull(isDecoy);
             ArgumentNullException.ThrowIfNull(groupKeys);
@@ -212,7 +218,7 @@ namespace StatisticalModels
                             // As DIA-NN removes low-confidence identifications before training: the targets and the decoys
                             // ranked highest, half the cap each, so real targets are a large share of the positives
                             var ranked = rows.OrderByDescending(pick).ThenBy(i => i).ToArray();
-                            rows = ConfidentTrainingRows(ranked, ranked.Select(pick).ToArray(), isDecoy, cap, networkPositiveQValue);
+                            rows = ConfidentTrainingRows(ranked, ranked.Select(pick).ToArray(), isDecoy, cap, networkPositiveQValue, networkTargetFraction);
                         }
                         else if (maxNetworkTrainingRows is int cap2 && rows.Length > cap2)
                         {
@@ -442,8 +448,10 @@ namespace StatisticalModels
         /// only targets whose q-value in that ranking passes it are positives (at most half the cap), with as many of the top
         /// decoys; if none passes, the plain sample. Returned in ascending row order.
         /// </summary>
-        internal static int[] ConfidentTrainingRows(int[] ranked, double[] rankedScores, IReadOnlyList<bool> isDecoy, int cap, double? positiveQValue)
+        internal static int[] ConfidentTrainingRows(int[] ranked, double[] rankedScores, IReadOnlyList<bool> isDecoy, int cap, double? positiveQValue,
+            double targetFraction = 0.5)
         {
+            int targetCount = (int)Math.Floor(cap * targetFraction + 1e-9); // cap / 2 at one half, as before
             if (positiveQValue is double cutoff)
             {
                 double[] q = QValues(rankedScores, ranked.Select(i => isDecoy[i]).ToArray());
@@ -451,7 +459,7 @@ namespace StatisticalModels
                 if (targets.Length > 0)
                     return targets.Concat(ranked.Where(i => isDecoy[i]).Take(Math.Min(cap - cap / 2, targets.Length))).Order().ToArray();
             }
-            return ranked.Where(i => !isDecoy[i]).Take(cap / 2).Concat(ranked.Where(i => isDecoy[i]).Take(cap - cap / 2)).Order().ToArray();
+            return ranked.Where(i => !isDecoy[i]).Take(targetCount).Concat(ranked.Where(i => isDecoy[i]).Take(cap - targetCount)).Order().ToArray();
         }
     }
 }

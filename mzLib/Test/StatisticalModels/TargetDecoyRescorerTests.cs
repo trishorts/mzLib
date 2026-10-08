@@ -373,6 +373,28 @@ public class TargetDecoyRescorerTests
     }
 
     /// <summary>
+    /// The confident sample's share of targets can be set: at 0.7 a cap of 10 takes the top 7 targets and the top 3 decoys,
+    /// at 0.5 the halves as before, and a share outside (0, 1) is refused.
+    /// </summary>
+    [Test]
+    public void TheConfidentSampleTargetShareCanBeSet()
+    {
+        int[] ranked = Enumerable.Range(0, 20).ToArray();
+        double[] scores = ranked.Select(i => 20.0 - i).ToArray();
+        bool[] decoy = ranked.Select(i => i % 2 == 1).ToArray();
+
+        int[] seventy = TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: null, targetFraction: 0.7);
+        Assert.That(seventy, Is.EquivalentTo(ranked.Where(i => !decoy[i]).Take(7).Concat(ranked.Where(i => decoy[i]).Take(3))));
+        Assert.That(TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: null, targetFraction: 0.5),
+            Is.EqualTo(TargetDecoyRescorer.ConfidentTrainingRows(ranked, scores, decoy, cap: 10, positiveQValue: null)));
+
+        var features = ranked.Select(i => new[] { (double)i }).ToList();
+        var keys = ranked.Select(i => i.ToString()).ToList();
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, decoy, keys, networkTargetFraction: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TargetDecoyRescorer.Score(features, decoy, keys, networkTargetFraction: 1));
+    }
+
+    /// <summary>
     /// The network's hidden layers can be chosen (DIA-NN 2020's 25-20-15-10-5 by default): another architecture gives other
     /// scores, a wider one still finds non-linear signal a line misses, and an empty or zero-unit layer list is refused.
     /// </summary>
