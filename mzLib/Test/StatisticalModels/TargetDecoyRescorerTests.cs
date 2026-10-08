@@ -373,6 +373,31 @@ public class TargetDecoyRescorerTests
     }
 
     /// <summary>
+    /// The pooled confident sample takes the top rows of the ranking whatever their label: one score threshold, so every
+    /// score band keeps targets and decoys in their own proportion. Equal halves leave a band above the decoys' cutoff and
+    /// below the targets' where only decoys train, and the network learns that faint means decoy.
+    /// </summary>
+    [Test]
+    public void ThePooledConfidentSampleTakesTheTopRowsWhateverTheirLabel()
+    {
+        int[] ranked = Enumerable.Range(0, 20).ToArray();
+        double[] scores = ranked.Select(i => 20.0 - i).ToArray();
+        // Targets dominate the top of the ranking, as real ones lift them
+        bool[] decoy = ranked.Select(i => i >= 6 && i % 2 == 1).ToArray();
+
+        int[] pooled = TargetDecoyRescorer.PooledTrainingRows(ranked, cap: 10);
+        Assert.That(pooled, Is.EqualTo(ranked.Take(10).Order()));
+        Assert.That(pooled.Count(i => !decoy[i]), Is.GreaterThan(5), "more targets than half when targets lead the ranking");
+
+        var random = new Random(5);
+        var features = ranked.Select(i => new[] { random.NextDouble() + (decoy[i] ? 0 : 0.5), random.NextDouble() }).ToList();
+        var keys = ranked.Select(i => i.ToString()).ToList();
+        var result = TargetDecoyRescorer.Score(features, decoy, keys, model: RescoreModel.NeuralNetworkEnsemble, maxNetworkTrainingRows: 10,
+            networkTrainingSample: NetworkTrainingSample.ConfidentPooled, networkMembers: 2, networkEpochs: 2);
+        Assert.That(result.Scores, Has.All.Matches<double>(double.IsFinite));
+    }
+
+    /// <summary>
     /// The confident sample's share of targets can be set: at 0.7 a cap of 10 takes the top 7 targets and the top 3 decoys,
     /// at 0.5 the halves as before, and a share outside (0, 1) is refused.
     /// </summary>

@@ -78,6 +78,12 @@ namespace StatisticalModels
 
         /// <summary>Half from the targets the linear model ranks highest, half from the decoys it ranks highest.</summary>
         Confident,
+
+        /// <summary>
+        /// The rows the linear model ranks highest, targets and decoys together: one score threshold, so no score band
+        /// trains on decoys alone.
+        /// </summary>
+        ConfidentPooled,
     }
 
     public static class TargetDecoyRescorer
@@ -213,7 +219,12 @@ namespace StatisticalModels
                             pick = i => current[i];
                         }
                         int[] rows = TopPerGroup(trainGroups, pick);
-                        if (maxNetworkTrainingRows is int cap && rows.Length > cap && networkTrainingSample == NetworkTrainingSample.Confident)
+                        if (maxNetworkTrainingRows is int pooledCap && rows.Length > pooledCap && networkTrainingSample == NetworkTrainingSample.ConfidentPooled)
+                        {
+                            // One threshold for both labels: equal halves leave a band where only decoys train
+                            rows = PooledTrainingRows(rows.OrderByDescending(pick).ThenBy(i => i).ToArray(), pooledCap);
+                        }
+                        else if (maxNetworkTrainingRows is int cap && rows.Length > cap && networkTrainingSample == NetworkTrainingSample.Confident)
                         {
                             // As DIA-NN removes low-confidence identifications before training: the targets and the decoys
                             // ranked highest, half the cap each, so real targets are a large share of the positives
@@ -441,6 +452,9 @@ namespace StatisticalModels
 
         /// <summary>Target-decoy q-values in input order, from the shared <see cref="TargetDecoyQValues"/>.</summary>
         internal static double[] QValues(double[] scores, bool[] isDecoy) => TargetDecoyQValues.Compute(scores, isDecoy);
+
+        /// <summary>The pooled confident sample: the first <paramref name="cap"/> of <paramref name="ranked"/> (best first), in ascending row order.</summary>
+        internal static int[] PooledTrainingRows(int[] ranked, int cap) => ranked.Take(cap).Order().ToArray();
 
         /// <summary>
         /// The confident training sample from rows <paramref name="ranked"/> best first (their scores in
