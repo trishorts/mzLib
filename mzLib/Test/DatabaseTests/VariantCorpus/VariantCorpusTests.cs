@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -571,7 +571,7 @@ namespace Test.DatabaseTests.VariantCorpus
 
             // S09 — substitution BLOCKS a cut site via the not-before-proline rule (I5->P), under trypsin
             // (K[P]|,R[P]|). Consensus PEPKIDE -> {PEPK, IDE} (K4 before I, cuts); variant PEPKPDE -> {PEPKPDE}
-            // (K4 now before P, cut suppressed). Under plain trypsin the variant would still cut (PEPK + PDE), so
+            // (K4 now before P, cut suppressed). Under trypsin/P the variant would still cut (PEPK + PDE), so
             // this node specifically pins trypsin's proline restriction, not just any K-adjacent edit.
             yield return new CorpusCase(
                 Id: "S09", Layer: "L3-digest", Tests: "sub-blocks-cut-before-proline",

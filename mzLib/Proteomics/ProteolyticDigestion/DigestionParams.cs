@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Omics.Digestion;
 using Omics.Fragmentation;
 
