@@ -427,8 +427,8 @@ namespace Proteomics.ProteolyticDigestion
 
             throw new KeyNotFoundException(
                 $"Protease '{name}' not found in dictionary. " +
-                $"If using an old-style name, ensure it follows the pattern " +
-                $"'name (don't cleave before proline)' which maps to 'name|P'.");
+                $"Historical spellings are accepted: 'name|P' and 'name (don't cleave before proline)' " +
+                $"map to 'name', and 'name (cleave before proline)' maps to 'name/P'.");
         }
 
         /// <summary>
