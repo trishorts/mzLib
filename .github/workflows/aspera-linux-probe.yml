@@ -1,0 +1,79 @@
+name: Aspera Linux probe
+
+# Scratch workflow on the trishorts fork, not for merge. Answers pride's W2 (Aspera transport) question Q3
+# in design/ASPERA.md: on Linux, can ascp be installed unattended, reach fasp.ebi.ac.uk:33001 with EBI's
+# public RSA key, and deliver correct bytes? No mzLib code runs here; only ascp and the spec's command line.
+# Route A = the Linux ascp pridepy redistributes. Route B = IBM's own transfer SDK via aspera-cli.
+on:
+  push:
+    branches: [ scratch/aspera-linux-probe ]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PRIDEPY: https://raw.githubusercontent.com/PRIDE-Archive/pridepy/master/pridepy/aspera
+    steps:
+    - name: Key and files (PRIDE checksum rows, captured 2026-10-11)
+      run: |
+        curl -fsSL -o key.rsa "$PRIDEPY/key/aspera_tokenauth_id_rsa"
+        chmod 600 key.rsa
+        head -1 key.rsa
+        printf '%s\t%s\t%s\n' \
+          pride/data/archive/2012/03/PXD000001/README.txt 492753137013825025e6729c8798664f 1645 \
+          pride/data/archive/2012/03/PXD000001/PRIDE_Exp_Complete_Ac_22134.xml.gz 3695390efa9d1de3fed3a1c152847215 10668000 \
+          pride/data/archive/2020/03/PXD015239/190712-VL-BR-LFQ-1.mzid.gz c1aea128f167ffa1e4254f538cec3dc0 21027335 \
+          > files.tsv
+        cat > probe.sh <<'EOF'
+        #!/usr/bin/env bash
+        # probe.sh <label> <ascp>: the W2 spec's command line, one file at a time, then size + MD5 + EBI error text.
+        label=$1; ascp=$2; out=dl-$label; ok=0; n=0; mkdir -p "$out"
+        while IFS=$'\t' read -r path md5 size; do
+          n=$((n+1)); name=$(basename "$path"); t0=$(date +%s.%N)
+          "$ascp" -Q -l 300m -P 33001 -i key.rsa "prd_ascp@fasp.ebi.ac.uk:/$path" "$out/" > "$out/$name.log" 2>&1; rc=$?
+          secs=$(awk "BEGIN{print $(date +%s.%N) - $t0}")
+          got=$(stat -c %s "$out/$name" 2>/dev/null || echo missing)
+          gotmd5=$(md5sum "$out/$name" 2>/dev/null | cut -d' ' -f1)
+          errtext=$(grep -c -a '<Error><Code>' "$out/$name" 2>/dev/null); errtext=${errtext:-0}
+          verdict=FAIL; [ "$rc" = 0 ] && [ "$got" = "$size" ] && [ "$gotmd5" = "$md5" ] && [ "$errtext" = 0 ] && verdict=OK && ok=$((ok+1))
+          echo "RESULT $label $name exit=$rc size=$got/$size md5=$([ "$gotmd5" = "$md5" ] && echo match || echo MISMATCH) errorText=$errtext secs=$secs $verdict"
+          tail -3 "$out/$name.log" | sed 's/^/    ascp: /'
+        done < files.tsv
+        echo "SUMMARY $label $ok/$n OK"
+        [ "$ok" = "$n" ]
+        EOF
+        chmod +x probe.sh
+
+    - name: "Route A: pridepy's Linux ascp"
+      id: route_a
+      continue-on-error: true
+      run: |
+        mkdir -p a/linux-64 a/etc
+        curl -fsSL -o a/linux-64/ascp "$PRIDEPY/linux-64/ascp"
+        curl -fsSL -o a/etc/aspera-license "$PRIDEPY/etc/aspera-license"
+        curl -fsSL -o a/etc/aspera.conf "$PRIDEPY/etc/aspera.conf"
+        chmod +x a/linux-64/ascp
+        a/linux-64/ascp -A || true
+        ./probe.sh pridepy "$PWD/a/linux-64/ascp"
+
+    - name: "Route B: IBM transfer SDK via aspera-cli"
+      id: route_b
+      continue-on-error: true
+      run: |
+        sudo apt-get install -y -qq ruby-full > /dev/null
+        sudo gem install aspera-cli --no-document > /dev/null
+        ascli config ascp install
+        ascli config ascp info || true
+        ASCP=$(ascli config ascp show)
+        echo "ascp at $ASCP"
+        "$ASCP" -A || true
+        ./probe.sh ibm-sdk "$ASCP"
+
+    - name: Verdict
+      if: always()
+      run: |
+        echo "route A (pridepy ascp): ${{ steps.route_a.outcome }}"
+        echo "route B (IBM SDK ascp): ${{ steps.route_b.outcome }}"
+        [ "${{ steps.route_a.outcome }}" = success ] || [ "${{ steps.route_b.outcome }}" = success ]
