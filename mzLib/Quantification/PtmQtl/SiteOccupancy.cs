@@ -47,8 +47,10 @@ public enum OccupancyState
     /// <summary>The modified form was identified, but nothing covering the site was quantified (<c>DEF-OCC-COUNTONLY</c>).</summary>
     CountOnly,
     /// <summary>
-    /// The site was covered by quantified peptides, but no modified form was identified in this run. The
-    /// modification may be absent or below detection; occupancy is unknown, not 0 (<c>DEF-OCC-ABSENT</c>).
+    /// A covered-zero (<c>DEF-OCC-COVERED-ZERO</c>): peptidoforms covering the site were identified in this run, and
+    /// none carried the modification. Not a measured 0 and not unknown: a bound, the occupancy below what this run
+    /// could detect. <see cref="SiteRunOccupancy.Fraction"/> is NaN; a caller that uses it does so as a bound (e.g.
+    /// <see cref="PtmPairEngine.CoVarying"/> with includeBounds). A site no peptidoform covered has no row.
     /// </summary>
     NotDetected,
 }
@@ -80,12 +82,27 @@ public sealed record ModificationSite(string ProteinAccession, int Position, cha
 /// sets <see cref="ReportedFraction"/>: there the fraction is written exactly while the intensities are rounded,
 /// so their ratio is not the value that was measured.
 /// </para>
+/// <para>
+/// <see cref="CoveringPeptidoforms"/> and <see cref="ModifiedPeptidoforms"/> count identifications, not intensity:
+/// how many distinct peptidoforms covering the position were identified in the run, and how many of them carried
+/// the modification there. They tell a count-only cell seen only modified from one where both forms were
+/// identified, and they are the "k of N" of a cell without both intensities.
+/// </para>
 /// </remarks>
 public sealed record SiteRunOccupancy(ModificationSite Site, string Run, OccupancyState State,
     double ModifiedIntensity, double CoveringIntensity, bool UnmodifiedQuantified)
 {
     /// <summary>The fraction as its producer reported it, when that is more exact than the intensity ratio; otherwise null.</summary>
     public double? ReportedFraction { get; init; }
+
+    /// <summary>Distinct peptidoforms covering the position identified in this run, or null when not supplied.</summary>
+    public int? CoveringPeptidoforms { get; init; }
+
+    /// <summary>
+    /// Of <see cref="CoveringPeptidoforms"/>, those carrying the modification at the position, or null when not
+    /// supplied. 0 for <see cref="OccupancyState.NotDetected"/>.
+    /// </summary>
+    public int? ModifiedPeptidoforms { get; init; }
 
     /// <summary>
     /// When <see cref="State"/> is Quantified: <see cref="ReportedFraction"/> if set, else ModifiedIntensity / CoveringIntensity.
@@ -153,29 +170,39 @@ public static class SiteOccupancyCalculator
             var sites = protein.SelectMany(p => p.sites).Distinct()
                 .OrderBy(s => s.Position).ThenBy(s => s.Modification, StringComparer.Ordinal).ToList();
             if (sites.Count == 0) continue;
+            var forms = new HashSet<string>(StringComparer.Ordinal);
+            var carrying = new HashSet<string>(StringComparer.Ordinal);
             foreach (var run in protein.GroupBy(p => p.obs.Run, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
             {
                 foreach (var site in sites)
                 {
                     double modified = 0, covering = 0, unmodified = 0;
-                    bool identified = false, covered = false;
+                    bool covered = false;
+                    forms.Clear();
+                    carrying.Clear();
                     foreach (var (obs, _, obsSites) in run)
                     {
                         if (site.Position < obs.StartResidue || site.Position > obs.EndResidue) continue;
                         bool carries = obsSites.Contains(site);
-                        if (carries) identified = true;
+                        forms.Add(obs.FullSequence);
+                        if (carries) carrying.Add(obs.FullSequence);
                         if (double.IsNaN(obs.Intensity)) continue;
                         covered = true;
                         covering += obs.Intensity;
                         if (carries) modified += obs.Intensity; else unmodified += obs.Intensity;
                     }
+                    bool identified = carrying.Count > 0;
+                    // A covered-zero needs coverage by identification only: what the run sampled, not what it quantified.
                     OccupancyState? state =
                         identified && covered && covering > 0 ? (modified > 0 ? OccupancyState.Quantified : OccupancyState.Floor)
                         : identified ? OccupancyState.CountOnly
-                        : covered && covering > 0 ? OccupancyState.NotDetected
+                        : forms.Count > 0 ? OccupancyState.NotDetected
                         : null;
                     if (state is OccupancyState s)
-                        result.Add(new SiteRunOccupancy(site, run.Key, s, modified, covering, unmodified > 0));
+                        result.Add(new SiteRunOccupancy(site, run.Key, s, modified, covering, unmodified > 0)
+                        {
+                            CoveringPeptidoforms = forms.Count, ModifiedPeptidoforms = carrying.Count,
+                        });
                 }
             }
         }
@@ -243,6 +270,10 @@ public static class SiteOccupancyCalculator
     /// Quantified when any run is; otherwise Floor when the modified form was identified in some run and the site
     /// was covered in some run; otherwise CountOnly when identified; otherwise NotDetected.
     /// <see cref="SiteRunOccupancy.UnmodifiedQuantified"/> is true when it is true in any run.
+    /// <see cref="SiteRunOccupancy.CoveringPeptidoforms"/> and <see cref="SiteRunOccupancy.ModifiedPeptidoforms"/> are
+    /// summed over the runs when every run has them (else null): a peptidoform seen in two fractions counts twice, so
+    /// they are an upper bound; the per-sample <see cref="Calculate(IEnumerable{PeptidoformObservation}, IReadOnlyDictionary{string, string}, Func{string, bool}?)"/>
+    /// counts distinct peptidoforms. A cell of a state this method does not know is refused, never combined as a bound.
     /// </para>
     /// <para>
     /// As with the observations, map only fractions together, never technical replicates.
@@ -266,6 +297,8 @@ public static class SiteOccupancyCalculator
             if (c is null) throw new ArgumentException("An occupancy cell is null.", nameof(occupancy));
             if (!seen.Add((c.Site, c.Run)))
                 throw new ArgumentException($"{c.Site.Key} appears twice in {c.Run}; supply one cell per (site, run).", nameof(occupancy));
+            if (!Enum.IsDefined(c.State))
+                throw new ArgumentException($"{c.Site.Key} in {c.Run} has an unknown state {c.State}; it would be combined as a bound.", nameof(occupancy));
             if (c.State == OccupancyState.Quantified && !(double.IsFinite(c.CoveringIntensity) && c.CoveringIntensity > 0))
                 throw new ArgumentException(
                     $"{c.Site.Key} in {c.Run} is Quantified but its covering intensity is {c.CoveringIntensity}; its fraction cannot be weighted.",
@@ -286,7 +319,12 @@ public static class SiteOccupancyCalculator
                 : identified && covering > 0 ? OccupancyState.Floor
                 : identified ? OccupancyState.CountOnly
                 : OccupancyState.NotDetected;
-            result.Add(new SiteRunOccupancy(g.Key.Site, g.Key.sample, state, modified, covering, g.Any(c => c.UnmodifiedQuantified)));
+            bool counted = g.All(c => c.CoveringPeptidoforms.HasValue && c.ModifiedPeptidoforms.HasValue);
+            result.Add(new SiteRunOccupancy(g.Key.Site, g.Key.sample, state, modified, covering, g.Any(c => c.UnmodifiedQuantified))
+            {
+                CoveringPeptidoforms = counted ? g.Sum(c => c.CoveringPeptidoforms!.Value) : null,
+                ModifiedPeptidoforms = counted ? g.Sum(c => c.ModifiedPeptidoforms!.Value) : null,
+            });
         }
         return result;
     }
