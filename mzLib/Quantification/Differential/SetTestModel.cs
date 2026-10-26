@@ -18,12 +18,12 @@ public static class SetNotRunReason
     public const string NotConverged = "not_converged";
     /// <summary>
     /// The freeze names a factor or level the dataset's design does not have, followed by what was missing.
-    /// <b>Pending the user's ruling</b> (the contract has no reason for it).
+    /// Ruled by the user 2026-10-26 (DATA-DEFINITIONS v3.18).
     /// </summary>
     public const string NotInDesignPrefix = "not_in_design:";
     /// <summary>
     /// An <c>attenuated_*</c> prediction whose members' frozen mRNA change is missing or on the other side of 0.
-    /// <b>Pending the user's ruling.</b>
+    /// Ruled by the user 2026-10-26 (DATA-DEFINITIONS v3.18).
     /// </summary>
     public const string MrnaNotUsablePrefix = "mrna_not_usable:";
 }
@@ -161,7 +161,8 @@ public static class SetMemberStateFromRow
     /// <c>seen_one_side</c> states, <see cref="Incomplete"/> (no-change predictions only), else <see cref="Tested"/>.
     /// </summary>
     /// <remarks>
-    /// <b>Readings pending the user's ruling</b> (the contract maps only <c>below_support:*</c> and <c>absent_in_*</c>):
+    /// <b>Readings ruled by the user 2026-10-26</b> (DATA-DEFINITIONS v3.18; v3.12 mapped only <c>below_support:*</c>
+    /// and <c>absent_in_*</c>):
     /// a STAT1 row <c>absent_in_both</c> is <see cref="TooFew"/>; a row <c>not_converged</c> or <c>not_estimable:*</c> does
     /// not stop the member, whose values still enter the set's own model (a single, which is STAT1's row, is then not run).
     /// </remarks>
@@ -205,7 +206,7 @@ public static class SetMemberStateFromRow
                 Stat1Row = row,
                 SamplesWithValueNumerator = num,
                 SamplesWithValueDenominator = den,
-                // Pending the user's ruling: an incomplete member stays in the estimate (ruling 3 of v3.12 declined
+                // Ruled by the user 2026-10-26: an incomplete member stays in the estimate (ruling 3 of v3.12 declined
                 // leaving it out) and blocks supported.
                 InEstimate = state is Tested or Incomplete,
             });
@@ -593,7 +594,7 @@ public static class SetTest
         double? mrnaMean = null;
         if (part.Prediction is SetPrediction.AttenuatedDown or SetPrediction.AttenuatedUp)
         {
-            // Pending the user's ruling: m̄ over the members in the estimate, so the bound matches what β̄ averages.
+            // Ruled by the user 2026-10-26: m̄ over the members in the estimate, so the bound matches what β̄ averages.
             var names = inEstimate.Select(x => x.Assignment.Member).ToHashSet(StringComparer.Ordinal);
             var mrna = contrast.Rows.Where(r => names.Contains(r.Member)).Select(r => r.MrnaLog2).ToList();
             if (mrna.Count > 0 && mrna.Any(v => v is null))
@@ -621,7 +622,7 @@ public static class SetTest
         }
         else
         {
-            // Pending the user's ruling: the minimum counts protein groups, each once, so one family group shared through
+            // Ruled by the user 2026-10-26: the minimum counts protein groups, each once, so one family group shared through
             // the all-members exception counts once.
             var groups = inEstimate.Select(x => x.Assignment.ProteinGroup!).Distinct(StringComparer.Ordinal).ToList();
             if (groups.Count < MinimumTestedMembers)
