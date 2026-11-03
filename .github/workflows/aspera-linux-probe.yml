@@ -16,6 +16,16 @@ jobs:
     env:
       PRIDEPY: https://raw.githubusercontent.com/PRIDE-Archive/pridepy/master/pridepy/aspera
     steps:
+    - name: "HTTPS sample of ftp.pride (PXR-W7, 2026-11-03: is this machine refused, or everyone?)"
+      continue-on-error: true
+      run: |
+        for i in 1 2 3 4 5 6 7 8; do
+          printf '%s ' "$(date -u +%T)"
+          curl -s -o /dev/null -I --max-time 15 -w "%{http_code} connect=%{time_connect}s\n" \
+            https://ftp.pride.ebi.ac.uk/pride/data/archive/2012/03/PXD000001/README.txt || echo "curl exit $?"
+          sleep 6
+        done
+
     - name: Key and files (PRIDE checksum rows, captured 2026-10-11)
       run: |
         curl -fsSL -o key.rsa "$PRIDEPY/key/aspera_tokenauth_id_rsa"
