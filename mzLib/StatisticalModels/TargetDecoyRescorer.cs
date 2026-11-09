@@ -235,8 +235,7 @@ namespace StatisticalModels
                         {
                             // A random subsample of the fold's own training rows, seeded by the fold. Not the top rows by the
                             // linear score: where the line misses the signal, its top rows are the wrong ones.
-                            var sampler = new Random(31 + f + 1000 * randomSeed + 100_000 * pass);
-                            rows = rows.OrderBy(_ => sampler.Next()).Take(cap2).Order().ToArray();
+                            rows = RandomTrainingRows(rows, isDecoy, cap2, new Random(31 + f + 1000 * randomSeed + 100_000 * pass));
                         }
                         var ensemble = MultilayerPerceptron.TrainEnsemble(rows.Select(i => features[i]).ToList(), rows.Select(i => !isDecoy[i]).ToList(),
                             networkMembers, networkLayers ?? NetworkLayers, networkEpochs, seed: 17 + f + 1000 * randomSeed + 100_000 * pass);
@@ -346,8 +345,12 @@ namespace StatisticalModels
         {
             int p = features.Count == 0 ? 0 : features[0].Length;
             var groups = RowGroups.Of(train, candidateGroups);
+            // The requested cutoff, then the relaxed ones above it: the choice below needs only each slot's passing count at
+            // these, so a slot keeps its counts, not its q-values (152 slots of millions of rows, per fold, were most of a
+            // DIA search's peak memory)
+            double[] cutoffs = new[] { cutoff }.Concat(RelaxedCutoffs.Where(c => c > cutoff)).ToArray();
             // Every feature and sign is judged independently, so in parallel, each into its own slot (same order as before)
-            var slots = new (int Feature, int Sign, double Separation, double[] Q, bool[] Decoy)[2 * p];
+            var slots = new (int Feature, int Sign, double Separation, int[] Passing)[2 * p];
             System.Threading.Tasks.Parallel.For(0, 2 * p, k =>
             {
                 int j = k / 2, sign = k % 2 == 0 ? 1 : -1;
@@ -356,18 +359,32 @@ namespace StatisticalModels
                 bool[] rowDecoy = rows.Select(i => isDecoy[i]).ToArray();
                 double[] values = rows.Select(i => features[i][j]).ToArray();
                 double separation = StandardizedMeanDifference(values, rowDecoy);
-                slots[k] = (j, sign, sign * separation, QValues(values.Select(v => sign * v).ToArray(), rowDecoy), rowDecoy);
+                // The signed values in place (sign * v, exactly): the unsigned ones are not needed again
+                if (sign < 0)
+                    for (int t = 0; t < values.Length; t++)
+                        values[t] = sign * values[t];
+                double[] q = QValues(values, rowDecoy);
+                var passing = new int[cutoffs.Length];
+                for (int t = 0; t < q.Length; t++)
+                    if (!rowDecoy[t])
+                        for (int c = 0; c < cutoffs.Length; c++)
+                            if (q[t] <= cutoffs[c])
+                                passing[c]++;
+                slots[k] = (j, sign, sign * separation, passing);
             });
-            var candidates = slots.ToList();
 
-            int PassingOf((int Feature, int Sign, double Separation, double[] Q, bool[] Decoy) k, double c) =>
-                Enumerable.Range(0, k.Q.Length).Count(t => !k.Decoy[t] && k.Q[t] <= c);
-            double chosenCutoff = new[] { cutoff }.Concat(RelaxedCutoffs.Where(c => c > cutoff))
-                .FirstOrDefault(c => candidates.Any(k => PassingOf(k, c) >= MinimumPositives), cutoff);
-            var best = candidates
-                .OrderByDescending(k => PassingOf(k, chosenCutoff))
-                .ThenByDescending(k => k.Separation)
-                .ThenBy(k => k.Feature).ThenByDescending(k => k.Sign)
+            // The first cutoff at which some slot passes enough targets; the requested one when none does
+            int chosen = 0;
+            for (int c = 0; c < cutoffs.Length; c++)
+                if (slots.Any(s => s.Passing[c] >= MinimumPositives))
+                {
+                    chosen = c;
+                    break;
+                }
+            var best = slots
+                .OrderByDescending(s => s.Passing[chosen])
+                .ThenByDescending(s => s.Separation)
+                .ThenBy(s => s.Feature).ThenByDescending(s => s.Sign)
                 .First();
             return (best.Feature, best.Sign);
         }
@@ -441,13 +458,28 @@ namespace StatisticalModels
         /// <summary>(mean of targets − mean of decoys) / pooled SD; 0 when either class is missing or the feature is constant.</summary>
         internal static double StandardizedMeanDifference(double[] values, bool[] isDecoy)
         {
-            double[] targets = values.Where((_, t) => !isDecoy[t]).ToArray();
-            double[] decoys = values.Where((_, t) => isDecoy[t]).ToArray();
-            if (targets.Length == 0 || decoys.Length == 0)
+            // Each class's mean as LINQ's Average takes it over an array (a sum in row order, then one division), without the
+            // two class arrays: this runs for every feature and sign of every fold
+            double targetSum = 0, decoySum = 0;
+            int targets = 0, decoys = 0;
+            for (int t = 0; t < values.Length; t++)
+            {
+                if (isDecoy[t])
+                {
+                    decoySum += values[t];
+                    decoys++;
+                }
+                else
+                {
+                    targetSum += values[t];
+                    targets++;
+                }
+            }
+            if (targets == 0 || decoys == 0)
                 return 0;
             double mean = values.Average();
             double sd = Math.Sqrt(values.Sum(v => (v - mean) * (v - mean)) / Math.Max(1, values.Length - 1));
-            return sd > LinearDiscriminant.ConstantTolerance ? (targets.Average() - decoys.Average()) / sd : 0;
+            return sd > LinearDiscriminant.ConstantTolerance ? (targetSum / targets - decoySum / decoys) / sd : 0;
         }
 
         /// <summary>Target-decoy q-values in input order, from the shared <see cref="TargetDecoyQValues"/>.</summary>
@@ -466,6 +498,26 @@ namespace StatisticalModels
         }
 
         /// <summary>
+        /// A random <paramref name="cap"/> of <paramref name="rows"/>, in ascending row order. The network cannot train on one
+        /// class, so a draw that holds one label while the rows hold both gives up its last row to the first row of the other
+        /// label in the same random order. A draw that holds both is unchanged.
+        /// </summary>
+        internal static int[] RandomTrainingRows(int[] rows, IReadOnlyList<bool> isDecoy, int cap, Random sampler)
+        {
+            int[] shuffled = rows.OrderBy(_ => sampler.Next()).ToArray();
+            int[] sample = shuffled.Take(cap).ToArray();
+            bool hasTarget = sample.Any(i => !isDecoy[i]), hasDecoy = sample.Any(i => isDecoy[i]);
+            if (hasTarget != hasDecoy && sample.Length < shuffled.Length)
+            {
+                // The missing label is the decoys when only targets were drawn, and the other way round
+                int other = Array.FindIndex(shuffled, sample.Length, i => isDecoy[i] == hasTarget);
+                if (other >= 0)
+                    sample[^1] = shuffled[other];
+            }
+            return sample.Order().ToArray();
+        }
+
+        /// <summary>
         /// The confident training sample from rows <paramref name="ranked"/> best first (their scores in
         /// <paramref name="rankedScores"/>): the top half-cap of targets and of decoys. With <paramref name="positiveQValue"/>,
         /// only targets whose q-value in that ranking passes it are positives (at most half the cap), with as many of the top
@@ -475,6 +527,9 @@ namespace StatisticalModels
             double targetFraction = 0.5)
         {
             int targetCount = (int)Math.Floor(cap * targetFraction + 1e-9); // cap / 2 at one half, as before
+            // The network cannot train on one class: a small cap or share that rounds one away keeps a row of each (cap >= 2)
+            if (ranked.Any(i => !isDecoy[i]) && ranked.Any(i => isDecoy[i]))
+                targetCount = Math.Clamp(targetCount, 1, cap - 1);
             if (positiveQValue is double cutoff)
             {
                 double[] q = QValues(rankedScores, ranked.Select(i => isDecoy[i]).ToArray());
