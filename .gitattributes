@@ -94,3 +94,11 @@ mzLib/Test/DataFiles/Ontologies/*.xml -text
 ###############################################################################
 mzLib/Test/DataFiles/PXD*.mzid -text
 mzLib/Test/DataFiles/PXD*.mzid.gz binary
+
+###############################################################################
+# Spectronaut exports cut from public MassIVE deposits, see
+# mzLib/Test/FileReadingTests/ExternalFileTypes/SPECTRONAUT_PROVENANCE.md. Every kept
+# line is the deposited bytes, CRLF included, so the readers are tested against what
+# Spectronaut wrote rather than what a checkout normalised it to.
+###############################################################################
+mzLib/Test/FileReadingTests/ExternalFileTypes/Spectronaut* -text
