@@ -56,6 +56,12 @@ namespace Test.FileReadingTests.ReadersInfrastructure
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MetaMorpheus_1.1.11_AllQuantifiedPeptides.tsv", SupportedFileType.FlashLFQQuantifiedPeptide);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MetaMorpheus_RNA_AllQuantifiedTranscriptGroups.tsv", SupportedFileType.MetaMorpheusQuantifiedTranscriptGroups);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MetaMorpheus_RNA_AllQuantifiedOligos.tsv", SupportedFileType.FlashLFQQuantifiedOligo);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Spectronaut19_PG_Report.tsv", SupportedFileType.SpectronautProteinGroupReport);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\SpectronautPrecursor_pep_Report.tsv", SupportedFileType.SpectronautPrecursorReport);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Spectronaut_TRICReport.tsv", SupportedFileType.SpectronautTricReport);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Spectronaut_PG_Pivot_Report.tsv", SupportedFileType.SpectronautPivotReport);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Spectronaut_PTMSiteReport.tsv", SupportedFileType.SpectronautPtmSiteReport);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Spectronaut19_ConditionSetup.tsv", SupportedFileType.SpectronautConditionSetup);
         }
 
         private static IEnumerable<SupportedFileType> EnumTestCases() => Enum.GetValues<SupportedFileType>();
@@ -102,6 +108,8 @@ namespace Test.FileReadingTests.ReadersInfrastructure
         [TestCase(@"FileReadingTests\ExternalFileTypes\FraggerPsm_FragPipev21.1_psm.tsv", SupportedFileType.MsFraggerPsm)]
         [TestCase(@"FileReadingTests\ExternalFileTypes\DiaNn_LongFormat_report.tsv", SupportedFileType.DiaNnReport)]
         [TestCase(@"FileReadingTests\ExternalFileTypes\DiaNn2_report.parquet", SupportedFileType.DiaNnReportParquet)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\Spectronaut_TRICReport.tsv", SupportedFileType.SpectronautTricReport)]
+        [TestCase(@"FileReadingTests\ExternalFileTypes\SpectronautPrecursor_pep_Report.tsv", SupportedFileType.SpectronautPrecursorReport)]
         public static void TestIQuantifiableResultFileReaderWorks(string filePath, SupportedFileType expectedType)
         {
             IQuantifiableResultFile resultFile = FileReader.ReadQuantifiableResultFile(filePath);

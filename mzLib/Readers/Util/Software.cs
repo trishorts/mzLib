@@ -23,6 +23,7 @@
         Chimerys,
         DiaNn,     // files tested were from DIA-NN 1.8/1.9 long-format report.tsv
         Pytheas,
+        Spectronaut, // files tested were from Spectronaut 10 (csv) and 19.2, and from MassIVE deposits of 2022-2025 (tsv, tab-text xls)
 
         // Quantification
         FlashLFQ,

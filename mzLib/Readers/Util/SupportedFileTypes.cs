@@ -45,7 +45,13 @@ namespace Readers
         FlashLFQQuantifiedOligo,
         DiaNnReportParquet,
         DiaPrecursorTsv,
-        DiaPeptideTsv
+        DiaPeptideTsv,
+        SpectronautProteinGroupReport,
+        SpectronautPrecursorReport,
+        SpectronautTricReport,
+        SpectronautPivotReport,
+        SpectronautPtmSiteReport,
+        SpectronautConditionSetup
     }
 
     public static class SupportedFileTypeExtensions
@@ -116,9 +122,33 @@ namespace Readers
                 // MetaMorpheus's DIA precursor and peptide tables, recognized by the names MetaMorpheus gives them
                 SupportedFileType.DiaPrecursorTsv => "AllDiaPrecursors.tsv",
                 SupportedFileType.DiaPeptideTsv => "AllDiaPeptides.tsv",
+                // Spectronaut writes several report grains under the same "_Report.tsv" name (and as tab-text .xls or,
+                // from Spectronaut 10, comma .csv), so like DIA-NN's these are conventional names only: the grain is
+                // recognized by the header, never by the name. The TRIC, PTM site and condition setup names are
+                // Spectronaut's own and are also recognized as suffixes.
+                SupportedFileType.SpectronautProteinGroupReport => "_Report.tsv",
+                SupportedFileType.SpectronautPrecursorReport => "_Report.tsv",
+                SupportedFileType.SpectronautPivotReport => "_Report.tsv",
+                SupportedFileType.SpectronautTricReport => "_TRICReport.tsv",
+                SupportedFileType.SpectronautPtmSiteReport => "PTMSiteReport.tsv",
+                SupportedFileType.SpectronautConditionSetup => "_ConditionSetup.tsv",
                 _ => throw new MzLibException("File type not supported")
             };
         }
+
+        /// <summary>
+        /// The Spectronaut report type a header belongs to, or null when no Spectronaut reader claims it. Shared by the
+        /// .tsv, .xls and .csv branches of <see cref="ParseFileType"/>, because Spectronaut has written all three.
+        /// </summary>
+        private static SupportedFileType? SpectronautReportType(IReadOnlyCollection<string> header) => SpectronautReports.Sniff(header) switch
+        {
+            SpectronautGrain.Tric => SupportedFileType.SpectronautTricReport,
+            SpectronautGrain.PtmSite => SupportedFileType.SpectronautPtmSiteReport,
+            SpectronautGrain.Precursor => SupportedFileType.SpectronautPrecursorReport,
+            SpectronautGrain.ProteinGroup => SupportedFileType.SpectronautProteinGroupReport,
+            SpectronautGrain.Pivot => SupportedFileType.SpectronautPivotReport,
+            _ => null,
+        };
         public static SupportedFileType ParseFileType(this string filePath)
         {
             switch (Path.GetExtension(filePath).ToLower())
@@ -152,7 +182,18 @@ namespace Readers
                 case ".csv":
                     if (filePath.EndsWith(SupportedFileType.TopFDMzrt.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
                         return SupportedFileType.TopFDMzrt;
+                    // Spectronaut 10 exported reports as comma-separated .csv, and R re-saves quote every string. The
+                    // header is read only when the file is there, so a missing path still says "not supported".
+                    if (File.Exists(filePath) && SpectronautReportType(SpectronautReports.ReadHeader(filePath, out _)) is { } csvSpectronaut)
+                        return csvSpectronaut;
                     throw new MzLibException("Csv file type not supported");
+
+                case ".xls":
+                    // Spectronaut names its tab-separated text exports .xls (they are not Excel workbooks), and
+                    // deposits from 2022 to 2024 still use the name.
+                    if (File.Exists(filePath) && SpectronautReportType(SpectronautReports.ReadHeader(filePath, out _)) is { } xlsSpectronaut)
+                        return xlsSpectronaut;
+                    throw new MzLibException("Xls file type not supported");
 
                 case ".tsv":
                 {
@@ -205,6 +246,12 @@ namespace Readers
                         return SupportedFileType.DiaPrecursorTsv;
                     if (filePath.EndsWith(SupportedFileType.DiaPeptideTsv.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
                         return SupportedFileType.DiaPeptideTsv;
+                    if (filePath.EndsWith(SupportedFileType.SpectronautConditionSetup.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
+                        return SupportedFileType.SpectronautConditionSetup;
+                    if (filePath.EndsWith(SupportedFileType.SpectronautTricReport.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
+                        return SupportedFileType.SpectronautTricReport;
+                    if (filePath.EndsWith(SupportedFileType.SpectronautPtmSiteReport.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
+                        return SupportedFileType.SpectronautPtmSiteReport;
 
                         // these tsv cases are just .tsv and need an extra step to determine the type
                         // currently need to distinguish between FlashDeconvTsv and MsFraggerPsm
@@ -231,6 +278,11 @@ namespace Readers
                         && tsvHeaders.Contains("Stripped.Sequence")
                         && tsvHeaders.Contains("File.Name"))
                         return SupportedFileType.DiaNnReport;
+
+                    // Spectronaut writes several report grains under the one name "<date>_<time>_<analysis>_Report.tsv",
+                    // and its schemas are configurable, so the grain is read from the header.
+                    if (SpectronautReportType(SpectronautReports.SplitHeader(firstLine, out _)) is { } tsvSpectronaut)
+                        return tsvSpectronaut;
 
                     throw new MzLibException("Tsv file type not supported");
                 }
@@ -345,6 +397,12 @@ namespace Readers
                 SupportedFileType.DiaNnReportParquet => typeof(DiaNnParquetReportFile),
                 SupportedFileType.DiaPrecursorTsv => typeof(DiaPrecursorFile),
                 SupportedFileType.DiaPeptideTsv => typeof(DiaPeptideFile),
+                SupportedFileType.SpectronautProteinGroupReport => typeof(SpectronautProteinGroupReportFile),
+                SupportedFileType.SpectronautPrecursorReport => typeof(SpectronautPrecursorReportFile),
+                SupportedFileType.SpectronautTricReport => typeof(SpectronautTricReportFile),
+                SupportedFileType.SpectronautPivotReport => typeof(SpectronautPivotReportFile),
+                SupportedFileType.SpectronautPtmSiteReport => typeof(SpectronautPtmSiteReportFile),
+                SupportedFileType.SpectronautConditionSetup => typeof(SpectronautConditionSetupFile),
                 _ => throw new MzLibException("File type not supported")
             };
         }
