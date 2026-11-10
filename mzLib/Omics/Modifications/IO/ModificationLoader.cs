@@ -656,9 +656,13 @@ public static class ModificationLoader
                         { "Unimod", new List<string>{ac.ToString() } },
                     };
 
+                // UniProt's feature key for any glycan, so a glycan reads the same from either source
+                string featureType = target.classification is classification_t.Nlinkedglycosylation
+                    or classification_t.Olinkedglycosylation or classification_t.Otherglycosylation ? "CARBOHYD" : null;
+
                 if (target.NeutralLoss == null)
                 {
-                    yield return new Modification(_originalId: id, _modificationType: "Unimod",
+                    yield return new Modification(_originalId: id, _modificationType: "Unimod", _featureType: featureType,
                         _target: motif, _locationRestriction: pos, _chemicalFormula: cf,
                         _databaseReference: dblinks);
                 }
@@ -724,7 +728,7 @@ public static class ModificationLoader
                         }
                     }
                     yield return new Modification(_originalId: id, _target: motif,
-                        _locationRestriction: "Anywhere.", _modificationType: "Unimod",
+                        _locationRestriction: "Anywhere.", _modificationType: "Unimod", _featureType: featureType,
                         _chemicalFormula: cf, _databaseReference: dblinks, _neutralLosses: neutralLosses);
                 }
             }
