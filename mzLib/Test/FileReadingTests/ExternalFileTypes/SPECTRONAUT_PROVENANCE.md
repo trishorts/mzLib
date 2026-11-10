@@ -24,4 +24,8 @@ fetched: the first 64 KB, or 64 KB at a stated offset. Their SHA-256 is of the f
 | `Spectronaut_custom_Pivot_Report.csv` | 10 | 6774 | `4d36f1922d595316` | MSV000090777 quant/Results/120min/20220513_165438_2022_0513_SSL2_ND_InjvsNon_120min_Spec16_Library_v01/2022_0513_SSL2_ND_InjvsNon_120min_Spec16_Library_v01_Report_Birgit.csv (first 64 KB) | `e99abfd6a27b15c0` | The first 10 data rows. |
 | `Spectronaut_PTMSiteReport.tsv` | 23 | 7378 | `8c532ddde5ffd41e` | MSV000090777 quant/Results/120min/20220722_135200_22_0722_SSL2_ND_120min_Inj_Library_v01/22_0722_SSL2_ND_120min_Inj_Library_v01_-PTMSiteReport.tsv (first 64 KB) | `297dde1f1b1b5216` | The first 20 rows, plus the first 3 Oxidation (M) sites. File order is kept. |
 
-Datasets: MSV000096226 (= PXD057243), MSV000098115, MSV000087085, MSV000094212 and MSV000090777, all public at MassIVE.
+Datasets: MSV000096226 (= PXD057243), MSV000098115 (= PXD064862), MSV000087085 (= PXD024961), MSV000094212
+(= PXD050266) and MSV000090777 (= PXD038339), all public at MassIVE.
+
+Licence: all five datasets are released under CC0 1.0 Universal, as each MassIVE dataset page states
+(`dataset license: CC0 1.0 Universal`).
