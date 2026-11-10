@@ -286,6 +286,26 @@ namespace Test.DatabaseTests
             Assert.AreEqual("S-palmitoyl cysteine on C", firstMod.IdWithMotif);
         }
 
+        [TestCase("HexNAc on S", "CARBOHYD")]
+        [TestCase("HexNAc on N", "CARBOHYD")]
+        [TestCase("Hex on K", "CARBOHYD")]
+        [TestCase("Hex on Y", "CARBOHYD")]
+        [TestCase("Phospho on S", null)]
+        [TestCase("Phospho on Y", null)]
+        public static void UnimodGlycans_CarryTheFeatureTypeUniProtGivesGlycans(string idWithMotif, string featureType)
+        {
+            // Hex on K is "Other glycosylation"; Hex on Y and Phospho on Y have no neutral loss
+            var mods = Mods.UnimodModifications.Where(m => m.IdWithMotif == idWithMotif).Select(m => m.FeatureType);
+            Assert.That(mods, Is.Not.Empty.And.All.EqualTo(featureType));
+        }
+
+        [Test]
+        public static void ModsTxtHexNAc_CarriesTheFeatureTypeUniProtGivesGlycans()
+        {
+            var hexNAc = Mods.MetaMorpheusProteinModifications.Where(m => m.OriginalId == "HexNAc").Select(m => m.FeatureType);
+            Assert.That(hexNAc, Is.Not.Empty.And.All.EqualTo("CARBOHYD"));
+        }
+
         [Test]
         public static void LoadModWithNl()
         {

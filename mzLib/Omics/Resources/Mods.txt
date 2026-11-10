@@ -187,6 +187,7 @@ DR   Unimod; 28.
 //
 ID   HexNAc
 TG   Nxs or Nxt
+FT   CARBOHYD
 PP   Anywhere.
 NL   C8H13NO5
 CF   C8H13NO5
@@ -195,6 +196,7 @@ DR   Unimod; 43.
 //
 ID   HexNAc
 TG   S or T
+FT   CARBOHYD
 PP   Anywhere.
 NL   C8H13NO5
 CF   C8H13NO5
