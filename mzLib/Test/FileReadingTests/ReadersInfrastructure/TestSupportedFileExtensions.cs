@@ -45,6 +45,12 @@ namespace Test.FileReadingTests.ReadersInfrastructure
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Ms1Align_FlashDeconvOpenMs3.0.0_ms1.msalign", SupportedFileType.Ms1Align);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Ms2Align_FlashDeconvOpenMs3.0.0_ms2.msalign", SupportedFileType.Ms2Align);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\Casanovo_5.0.0.mztab", SupportedFileType.CasanovoMzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\OpenMS3.7_ProteomicsLFQ_1_out.mzTab", SupportedFileType.MzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\MaxQuant1.6.3.1_PXD011194_excerpt.mzTab", SupportedFileType.MzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\ProteomeDiscoverer2.5_MSV000096151_excerpt.mzTab", SupportedFileType.MzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\MassIVE_MSV000078886_excerpt.mzTab", SupportedFileType.MzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\Mascot2.3_jmzTab_small_excerpt.mzTab", SupportedFileType.MzTab);
+            yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\MzTab\PrideConverter_jmzTab_PRIDE_Example.mzTab", SupportedFileType.MzTab);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\DiaNn_LongFormat_report.tsv", SupportedFileType.DiaNnReport);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\DiaNn2_report.parquet", SupportedFileType.DiaNnReportParquet);
             yield return new TestCaseData(@"FileReadingTests\ExternalFileTypes\PXD000070.sdrf.tsv", SupportedFileType.Sdrf);
