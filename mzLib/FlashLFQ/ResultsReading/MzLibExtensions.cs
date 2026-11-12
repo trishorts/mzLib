@@ -47,6 +47,8 @@ namespace FlashLFQ
         /// q-value;</item>
         /// <item>DIA-NN (<see cref="DiaNnPrecursor"/>): Global.Q.Value. DIA-NN reports no PEP q-value (its PEP column is a
         /// raw posterior error probability) and no notch, so that is the only tier;</item>
+        /// <item>Spectronaut: m_score for the TRIC export (<see cref="SpectronautTricPrecursor"/>), EG.Qvalue for a precursor
+        /// report (<see cref="SpectronautPrecursor"/>), which is per run. Neither reports a PEP q-value or a notch;</item>
         /// <item>a record type that reports no q-value (MSFragger PSMs, for one) is kept: its tool filtered it;</item>
         /// <item>an ambiguous match is never kept, whatever its type.</item>
         /// </list>
@@ -156,6 +158,9 @@ namespace FlashLFQ
             SpectrumMatchFromTsv psm => (psm.QValue, psm.QValueNotch, psm.PEP_QValue, psm.PEP),
             LightWeightSpectralMatch light => (light.QValue, light.QValueNotch, light.PepQValue, light.Pep),
             DiaNnPrecursor diaNn => (diaNn.GlobalQValue, null, null, null),
+            // A missing q-value is NaN, which no threshold passes. Neither Spectronaut export reports a PEP q-value or a notch.
+            SpectronautTricPrecursor tric => (tric.MScore ?? double.NaN, null, null, null),
+            SpectronautPrecursor spectronaut => (spectronaut.QValue ?? double.NaN, null, null, null),
             _ => null,
         };
 
@@ -235,6 +240,22 @@ namespace FlashLFQ
                 // CScore is DIA-NN's classifier score, higher being better, which matches how
                 // DonorCriterion.Score reads PsmScore
                 score = diaNnPrecursor.CScore ?? 0;
+            }
+            else if (record is SpectronautTricPrecursor tric)
+            {
+                // m_score is the peak group's q-value in the OpenSWATH sense. Spectronaut's TRIC export is not
+                // filtered on it (values above 0.1 occur), so the gates below do the filtering. It reports no PEP.
+                // d_score is the discriminant, higher being better, as DonorCriterion.Score reads PsmScore.
+                qValue = tric.MScore ?? double.NaN;
+                score = tric.DScore ?? 0;
+            }
+            else if (record is SpectronautPrecursor spectronaut)
+            {
+                // EG.Qvalue is Spectronaut's precursor q-value. It is per run (Spectronaut reports no run-spanning one in
+                // the exports seen), unlike DIA-NN's Global.Q.Value above, and deposited reports are often not filtered on it.
+                qValue = spectronaut.QValue ?? double.NaN;
+                pepQValue = spectronaut.PosteriorErrorProbability ?? 0;
+                score = spectronaut.CScore ?? 0;
             }
 
             return new Identification(
