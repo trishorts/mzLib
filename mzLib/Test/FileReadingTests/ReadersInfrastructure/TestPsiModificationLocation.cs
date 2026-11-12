@@ -78,6 +78,54 @@ namespace Test.FileReadingTests.ReadersInfrastructure
             Assert.That(mods, Is.Empty);
         }
 
+        [TestCase("PEPMTIDE", 4, 15.9949146221, 5, "Oxidation on M")]
+        [TestCase("SAMPLER", 0, 42.0105646863, 1, "Acetyl on X")]           // not the side-chain Acetyl on S
+        [TestCase("KAMPLER", 0, 42.0105646863, 1, "Acetyl on X")]           // nor on K
+        [TestCase("PEPCTIDE", 4, 57.0214637236, 5, "Carbamidomethyl on C")]
+        [TestCase("PEPTIDEK", 8, 42.0105646863, 9, "Acetyl on K")]          // a residue location keeps the side chain
+        public void AMassResolvesToTheOneUnimodModificationThatFitsTheSite(string sequence, int location, double mass, int key, string expected)
+        {
+            var mods = new Dictionary<int, Modification>();
+
+            bool added = PsiModificationLocation.TryAddByMass(mods, sequence, location, $"CHEMMOD:{mass}", mass, Lookup, out var reason);
+
+            Assert.That(added, Is.True, reason);
+            Assert.That(mods.Keys, Is.EqualTo(new[] { key }));
+            Assert.That(mods[key].IdWithMotif, Is.EqualTo(expected));
+            if (location == 0)
+            {
+                Assert.That(mods[key].LocationRestriction, Does.Contain("N-terminal"));
+            }
+        }
+
+        [TestCase("PEPTIDE", 2, 1234.5678, "CHEMMOD:x at location 2 matches no Unimod modification within 0.01 Da")]
+        [TestCase("PEPTIDE", 9, 15.9949, "modification location 9 is not on the peptide")]
+        public void AMassThatCannotBePlacedIsNotAdded(string sequence, int location, double mass, string expectedReason)
+        {
+            var mods = new Dictionary<int, Modification>();
+
+            bool added = PsiModificationLocation.TryAddByMass(mods, sequence, location, "CHEMMOD:x", mass, Lookup, out var reason);
+
+            Assert.That(added, Is.False);
+            Assert.That(reason, Is.EqualTo(expectedReason));
+            Assert.That(mods, Is.Empty);
+        }
+
+        /// <summary>
+        /// Dimethyl and Ethyl have one formula, C2H4, and both sit on K: the mass cannot tell them apart.
+        /// </summary>
+        [Test]
+        public void AMassThatFitsTwoUnimodModificationsAtTheSiteIsNotGuessed()
+        {
+            var mods = new Dictionary<int, Modification>();
+
+            bool added = PsiModificationLocation.TryAddByMass(mods, "PEPTIDEK", 8, "CHEMMOD:28.0313", 28.0313, Lookup, out var reason);
+
+            Assert.That(added, Is.False);
+            Assert.That(reason, Does.StartWith("CHEMMOD:28.0313 at location 8 matches more than one Unimod modification (UNIMOD:"));
+            Assert.That(reason, Does.Contain("UNIMOD:36").And.Contain("UNIMOD:280"));
+        }
+
         [Test]
         public void ASecondModificationAtOneLocationIsNotAddedAndTheFirstIsKept()
         {

@@ -16,8 +16,9 @@ public class MzIdentMLRecord : ISpectralMatch
 
     /// <summary>
     /// The scan number from the nativeID in <see cref="SpectrumId"/>. "scan=N" (Thermo, Proteome Discoverer)
-    /// gives N. CAREFUL: "index=N", which peak-list files use, is the zero-based position of the spectrum in
-    /// the file, not an instrument scan number, and gives N + 1. -1 when the nativeID has neither.
+    /// and "spectrum=N" (the spectrum's id) give N. CAREFUL: "index=N", which peak-list files use, is the
+    /// zero-based position of the spectrum in the file, not an instrument scan number, and gives N + 1. A Bruker
+    /// "frame=F scan=S", whose scan counts within the frame, and any other form give -1.
     /// </summary>
     public int OneBasedScanNumber { get; internal set; }
 

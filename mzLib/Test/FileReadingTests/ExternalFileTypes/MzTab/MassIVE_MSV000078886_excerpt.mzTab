@@ -1,0 +1,55 @@
+MTD	mzTab-version	1.0
+MTD	mzTab-mode	Summary
+MTD	mzTab-type	Identification
+MTD	mzTab-ID	tsv-00000.tsv
+MTD	title	MZTab file converted from tab-delimited result file "tsv-00000.tsv"
+MTD	description	This MZTab file was programmatically converted from tab-delimited result file "tsv-00000.tsv", using conversion software provided by the Center for Computational Mass Spectrometry of UCSD.
+MTD	fixed_mod[1]	[UNIMOD, UNIMOD:4, Carbamidomethyl, ]
+MTD	variable_mod[1]	[UNIMOD, UNIMOD:5, Carbamyl, ]
+MTD	variable_mod[2]	[UNIMOD, UNIMOD:35, Oxidation, ]
+MTD	variable_mod[3]	[UNIMOD, UNIMOD:28, Gln->pyro-Glu, ]
+MTD	variable_mod[4]	[MS, MS:1001460, unknown modification, (*#)]
+MTD	ms_run[1]-location	file://specs_ms.mgf
+
+PSH	sequence	PSM_ID	accession	unique	database	database_version	search_engine	modifications	retention_time	charge	exp_mass_to_charge	calc_mass_to_charge	spectra_ref	pre	post	start	end	opt_global_valid	opt_global_invalid_reason
+PSM	VKSPELQAEAK	1	sp|P02652	null	null	null	null	1-CHEMMOD:-1	null	3	null	null	ms_run[1]:index=50	K	S	null	null	VALID	null
+PSM	FIIPSPK	2	sp|P04114|APOB_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=451	-	-	null	null	VALID	null
+PSM	LVGFIDDAVKK	3	sp|P04114	null	null	null	null	1-CHEMMOD:-2	null	3	null	null	ms_run[1]:index=864	K	L	null	null	VALID	null
+PSM	EEFHEQSFR	4	sp|Q14520	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1231	K	V	null	null	VALID	null
+PSM	LAADDFR	5	Inst	null	null	null	null	null	null	2	null	null	ms_run[1]:index=1461	-	-	null	null	VALID	null
+PSM	GVRPSQGGEAPR	6	sp|P02751	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1538	L	E	null	null	VALID	null
+PSM	IHWESASLLR	7	sp|P01024	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1685	R	S	null	null	VALID	null
+PSM	KGYTQQLAFR	8	sp|P01024|CO3_HUMAN	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1686	-	-	null	null	VALID	null
+PSM	IHWESASLLR	9	sp|P01024	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1689	R	S	null	null	VALID	null
+PSM	IHWESASLLR	10	sp|P01024	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1690	R	S	null	null	VALID	null
+PSM	AQITGYR	11	sp|P02751|FINC_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=1756	-	-	null	null	VALID	null
+PSM	AQITGYR	12	sp|P02751|FINC_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=1762	-	-	null	null	VALID	null
+PSM	KGYTQQLAFR	13	sp|P01024|CO3_HUMAN	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1826	-	-	null	null	VALID	null
+PSM	VTIKPAPETEK	14	sp|P01024	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1831	K	R	null	null	VALID	null
+PSM	VTIKPAPETEK	15	sp|P01024	null	null	null	null	3-CHEMMOD:-3	null	3	null	null	ms_run[1]:index=1839	K	R	null	null	VALID	null
+PSM	HGGLYHENMR	16	sp|P08603	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1887	K	R	null	null	VALID	null
+PSM	HGGLYHENMR	17	sp|P08603	null	null	null	null	null	null	3	null	null	ms_run[1]:index=1892	K	R	null	null	VALID	null
+PSM	SFTVHWIAPR	18	sp|P02751	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2030	N	A	null	null	VALID	null
+PSM	ATEHLSTLSEK	19	sp|P02647	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2066	K	A	null	null	VALID	null
+PSM	HGGLYHENMR	20	sp|P08603|CFAH_HUMAN	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2084	-	-	null	null	VALID	null
+PSM	HGGLYHENMR	21	sp|P08603	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2143	K	R	null	null	VALID	null
+PSM	KGYTQQLAFR	22	sp|P01024	null	null	null	null	6-CHEMMOD:+1	null	3	null	null	ms_run[1]:index=2200	K	Q	null	null	VALID	null
+PSM	LADKFIIPGLK	23	sp|P04114	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2215	V	L	null	null	VALID	null
+PSM	AQITGYR	24	sp|P02751|FINC_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=2238	-	-	null	null	VALID	null
+PSM	SPPEISHGVVAH	25	sp|P08603	null	null	null	null	5-CHEMMOD:-14	null	3	null	null	ms_run[1]:index=2380	K	M	null	null	VALID	null
+PSM	ATEHLSTLSEK	26	sp|P02647	null	null	null	null	4-CHEMMOD:+2	null	3	null	null	ms_run[1]:index=2389	K	A	null	null	VALID	null
+PSM	HGGLYHENMR	27	sp|P08603	null	null	null	null	8-CHEMMOD:+2	null	3	null	null	ms_run[1]:index=2453	K	R	null	null	VALID	null
+PSM	HGGLYHENMR	28	sp|P08603	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2468	K	R	null	null	VALID	null
+PSM	LGMDGYR	29	sp|P61626|LYSC_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=2496	-	-	null	null	VALID	null
+PSM	LKSELEDNIR	30	sp|O14791	null	null	null	null	null	null	3	null	null	ms_run[1]:index=2562	R	R	null	null	VALID	null
+PSM	QTISRPK	31	sp|P01871|MUC_HUMAN	null	null	null	null	1-UNIMOD:28	null	2	null	null	ms_run[1]:index=2600	-	-	null	null	VALID	null
+PSM	HCYYQIRAK	48	XXX_sp|P00736	null	null	null	null	2-UNIMOD:4,9-CHEMMOD:-11	null	3	null	null	ms_run[1]:index=4196	E	Y	null	null	VALID	null
+PSM	DGVSVSLSS	87	XXX_sp|P01605	null	null	null	null	8-CHEMMOD:-18	null	2	null	null	ms_run[1]:index=6647	R	P	null	null	VALID	null
+PSM	VTWAPPPSIDLTNFLVR	788	sp|P02751	null	null	null	null	10-CHEMMOD:+54	null	4	null	null	ms_run[1]:index=39183	R	Y	null	null	VALID	null
+PSM	MESLGITSR	789	sp|P07357|CO8A_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=39184	-	-	null	null	VALID	null
+PSM	HIQNIDIQHLAGK	790	sp|P04114|APOB_HUMAN	null	null	null	null	null	null	3	null	null	ms_run[1]:index=39184	-	-	null	null	VALID	null
+PSM	DPSLGAQFR	790	sp|Q76LX8	null	null	null	null	null	null	2	null	null	ms_run[1]:index=39185	R	V	null	null	VALID	null
+PSM	GFLLLASLR	791	sp|P07996	null	null	null	null	null	null	2	null	null	ms_run[1]:index=39285	K	Q	null	null	VALID	null
+PSM	FLATTPNSLLVSWQPPR	792	sp|P02751	null	null	null	null	3-CHEMMOD:+55	null	4	null	null	ms_run[1]:index=39390	R	A	null	null	VALID	null
+PSM	DNVFDGLVR	1082	sp|P04114|APOB_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=46120	-	-	null	null	VALID	null
+PSM	DNVFDGLVR	1082	sp|P04114|APOB_HUMAN	null	null	null	null	null	null	2	null	null	ms_run[1]:index=46130	-	-	null	null	VALID	null

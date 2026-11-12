@@ -1,0 +1,93 @@
+MTD	mzTab-version	1.0
+MTD	mzTab-mode	Complete
+MTD	mzTab-type	Identification
+MTD	mzTab-ID	small
+MTD	title	Unknown experiment (mzIdentML)
+MTD	description	Spectrum Identification Protocol: Enzymes - Trypsin; Database Filters - DB filter taxonomy
+MTD	software[1]	[PSI-MS, MS:1001207, Mascot, 2.3.01]
+MTD	software[1]-setting[1]	Mascot:SigThreshold = 0.05
+MTD	software[1]-setting[2]	parent mass type mono = null
+MTD	software[1]-setting[3]	param: a ion = null
+MTD	software[1]-setting[4]	param: a ion-NH3 = null
+MTD	software[1]-setting[5]	param: b ion = null
+MTD	software[1]-setting[6]	param: b ion-NH3 = null
+MTD	software[1]-setting[7]	param: y ion = null
+MTD	software[1]-setting[8]	param: y ion-NH3 = null
+MTD	software[1]-setting[9]	Mascot User Comment = Small MGF search (mzIdentML test)
+MTD	software[1]-setting[10]	Mascot Instrument Name = Default
+MTD	software[1]-setting[11]	search tolerance plus value = 0.6
+MTD	software[1]-setting[12]	search tolerance minus value = 0.6
+MTD	software[1]-setting[13]	search tolerance plus value = 2.5
+MTD	software[1]-setting[14]	search tolerance minus value = 2.5
+MTD	software[2]	[PSI-MS, MS:1001478, Mascot Parser, 2.3.2.0]
+MTD	software[2]-setting[1]	no threshold = null
+MTD	software[2]-setting[2]	Mascot:SigThreshold = 0.05
+MTD	software[2]-setting[3]	Mascot:MaxProteinHits = Auto
+MTD	software[2]-setting[4]	Mascot:ProteinScoringMethod = MudPIT
+MTD	software[2]-setting[5]	Mascot:MinMSMSThreshold = 0
+MTD	software[2]-setting[6]	Mascot:ShowHomologousProteinsWithSamePeptides = 0
+MTD	software[2]-setting[7]	Mascot:ShowHomologousProteinsWithSubsetOfPeptides = 0
+MTD	software[2]-setting[8]	Mascot:RequireBoldRed = 0
+MTD	software[2]-setting[9]	Mascot:UseUnigeneClustering = false
+MTD	software[2]-setting[10]	Mascot:IncludeErrorTolerantMatches = 1
+MTD	software[2]-setting[11]	Mascot:ShowDecoyMatches = 0
+MTD	protein_search_engine_score[1]	[MS, MS:1001171, Mascot:score, ]
+MTD	psm_search_engine_score[1]	[MS, MS:1001172, Mascot:expectation value, ]
+MTD	psm_search_engine_score[2]	[MS, MS:1001171, Mascot:score, ]
+MTD	contact[1]-name	PERSON_DOC_OWNER Johannes Griss
+MTD	contact[1]-affiliation	ORG_DOC_OWNER
+MTD	fixed_mod[1]	[MS, MS:1002453, No fixed modifications searched, ]
+MTD	variable_mod[1]	[UNIMOD, UNIMOD:4, Carbamidomethyl, ]
+MTD	variable_mod[1]-site	C
+MTD	variable_mod[2]	[UNIMOD, UNIMOD:35, Oxidation, ]
+MTD	variable_mod[2]-site	M
+MTD	ms_run[1]-format	[PSI-MS, MS:1001062, Mascot MGF file, ]
+MTD	ms_run[1]-location	file:/lolo//small.mgf
+MTD	ms_run[1]-id_format	[PSI-MS, MS:1000774, multiple peak list nativeID format, ]
+MTD	custom[1]	[, , Date of export, Mon Aug 04 11:01:02 BST 2014]
+MTD	custom[2]	[, , Original converted file, /Users/user/Documents/Code/pride/jmztab/branches/jmztab-modular/jmztab-converters/target/test-classes/testset/small.mzid]
+
+COM	Only variable modifications can be reported when the original source is a MZIdentML XML file
+
+PRH	accession	description	taxid	species	database	database_version	search_engine	best_search_engine_score[1]	search_engine_score[1]_ms_run[1]	num_psms_ms_run[1]	num_peptides_distinct_ms_run[1]	num_peptides_unique_ms_run[1]	ambiguity_members	modifications	protein_coverage
+PRT	L1CAM_HUMAN	Neural cell adhesion molecule L1 OS=Homo sapiens GN=L1CAM PE=1 SV=2	null	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	null	53.83	1	null	null	null	null	null
+PRT	LRSM1_HUMAN	E3 ubiquitin-protein ligase LRSAM1 OS=Homo sapiens GN=LRSAM1 PE=1 SV=1	null	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	null	83.81	1	null	null	null	null	null
+PRT	TBCD5_HUMAN	TBC1 domain family member 5 OS=Homo sapiens GN=TBC1D5 PE=1 SV=1	null	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	null	53.84	1	null	null	null	null	null
+
+PSH	sequence	PSM_ID	accession	unique	database	database_version	search_engine	search_engine_score[1]	search_engine_score[2]	modifications	retention_time	charge	exp_mass_to_charge	calc_mass_to_charge	spectra_ref	pre	post	start	end	opt_global_mzidentml_original_ID	opt_global_cv_MS:1002217_decoy_peptide
+PSM	KREEAPSLRPAPPPISGGGYR	1	FIBB_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	27.6431884156992	9.45	null	null	3	746.06616	745.737928	ms_run[1]:465	K	A	52	72	SII_791_2	0
+PSM	STAAMSTYTGIFTDQVLSVLK	2	APOC2_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0215200921399845	40.48	5-UNIMOD:35,5-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	3	750.99646	750.383847666667	ms_run[1]:244	K	G	78	98	SII_861_1	0
+PSM	VSEADSSNADWVTK	3	CFAB_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	6.41536803990343E-4	56.84	null	null	2	755.12149	754.846807	ms_run[1]:863	K	Q	324	337	SII_633_1	0
+PSM	VGFGNVEDEFWLGLDNIHR	4	TENR_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	8.20643122061247E-4	54.85	null	null	3	740.11591	739.695635666667	ms_run[1]:708	R	I	1199	1217	SII_705_1	0
+PSM	EVAGAKPHITAAEGK	5	IMMT_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0169944813089598	42.45	null	null	2	741.08826	739.901708	ms_run[1]:696	K	L	316	330	SII_72_1	0
+PSM	ADFLEQPVLGFVR	6	B3AT_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.00807822676373481	46.0	null	null	2	746.82824	745.9037375	ms_run[1]:491	R	L	234	246	SII_289_1	0
+PSM	SQTGVGELTTQNTR	7	EXOC4_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	1.34799127941303E-6	83.7	null	null	2	747.39243	746.3735325	ms_run[1]:462	R	L	935	948	SII_318_1	0
+PSM	LDETGNLMISEGHFASETIR	8	SPTA2_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	5.17483431253255	16.83	null	null	3	740.62882	740.691551333333	ms_run[1]:753	K	T	102	121	SII_717_1	0
+PSM	LHSLHLEGSCLGR	9	ALS_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	1.21890485062087E-4	64.07	10-UNIMOD:4	null	2	740.36207	739.880262	ms_run[1]:686	K	I	388	400	SII_32_1	0
+PSM	MYLGYEYVTAIR	10	TRFE_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	4.95292428486801E-6	78.04	1-UNIMOD:35,1-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	2	747.1922	747.8684895	ms_run[1]:506	K	N	332	343	SII_310_1	0
+PSM	EWFWDLATGTMK	11	HEMO_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0770958931822223	36.19	null	null	2	743.7825	742.84757	ms_run[1]:851	R	E	167	178	SII_163_1	0
+PSM	FLEQQNKVLETK	12	K2C6A_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	5.25458597907054E-4	57.81	null	null	2	740.08015	738.906461	ms_run[1]:783	R	W	183	194	SII_11_1	0
+PSM	LFGYEPTIYYPK	13	AIBP_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0108781974810708	44.69	null	null	2	746.69909	745.881925	ms_run[1]:460	K	R	133	144	SII_280_1	0
+PSM	GQGTLSVVTMYHAK	14	CO3_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.00865090622859544	45.55	10-UNIMOD:35,10-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	2	754.82912	754.382314	ms_run[1]:41	K	A	1338	1351	SII_613_1	0
+PSM	KEDSCQLGYSAGPCMGMTSR	15	AMBP_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.00878281974076327	44.45	5-UNIMOD:4,14-UNIMOD:4,15-UNIMOD:35,15-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	3	751.65036	750.979728666667	ms_run[1]:233	K	Y	227	246	SII_865_1	0
+PSM	RDPHLACVAYER	16	CLH1_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	7.85358674529935E-4	56.14	7-UNIMOD:4	null	2	744.9688	743.8646065	ms_run[1]:536	K	G	912	923	SII_214_1	0
+PSM	VQLSNDFDEYIMAIEQTIK	17	CO3_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0240147910361005	40.07	null	null	3	753.5602	753.040067	ms_run[1]:814	K	S	1552	1570	SII_903_1	0
+PSM	KEDSCQLGYSAGPCMGMTSR	18	AMBP_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.011340546125947	43.34	5-UNIMOD:4,14-UNIMOD:4,17-UNIMOD:35,17-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	3	751.65036	750.979728666667	ms_run[1]:233	K	Y	227	246	SII_865_2	0
+PSM	KAEEEHLGILGPQLHADVGDK	19	CERU_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0513914411411286	36.74	null	null	3	753.22351	752.725471666667	ms_run[1]:812	R	V	799	819	SII_894_1	0
+PSM	VPQVSTPTLVEVSR	20	ALBU_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.55179085356966	27.46	null	null	2	757.38825	756.425039	ms_run[1]:882	K	N	439	452	SII_681_1	0
+PSM	SANLVAATLGAILNR	21	HXK1_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	6.41903985394616E-7	86.94	null	null	2	743.43187	742.4331715	ms_run[1]:547	R	L	382	396	SII_149_1	0
+PSM	VLAQATSDLVNAMR	22	TLN2_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	6.6124392307544E-5	66.71	13-UNIMOD:35,13-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	2	753.8391	752.8930335	ms_run[1]:123	R	S	831	844	SII_575_1	0
+PSM	SGHDQVVELLLER	23	ANK2_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	1.51895300550744E-5	73.14	null	null	2	748.55916	747.899175	ms_run[1]:321	R	G	309	321	SII_367_1	0
+PSM	ADLEMQIESLTEELAYLKK	24	K1C10_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	4.93328607376055	17.0	5-UNIMOD:35,5-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	3	747.78049	747.383710333333	ms_run[1]:824	K	N	267	285	SII_810_1	0
+PSM	VNYVVQEAIVVIR	25	AP2B1_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	6.03081566186226E-7	87.16	null	null	2	752.54825	751.4404805	ms_run[1]:247	K	D	403	415	SII_534_1	0
+PSM	AYLEGTCVEWLR	26	1B08_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0103601563483665	44.65	7-UNIMOD:4	null	2	749.48914	748.863744	ms_run[1]:400	R	R	182	193	SII_422_1	0
+PSM	TAELLSHHQVEIK	27	GLPK_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0183354528512688	42.28	null	null	2	754.02826	752.909536	ms_run[1]:132	K	Q	32	44	SII_582_1	0
+PSM	ELSCESYPIELR	28	LPHN3_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.00196501698906199	51.87	4-UNIMOD:4	null	2	749.37992	748.35848	ms_run[1]:349	R	C	33	44	SII_411_1	0
+PSM	ITFELVYEELLK	29	ITIH4_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	4.32878792555428E-4	58.44	null	null	2	749.39772	748.91596	ms_run[1]:986	K	R	140	151	SII_415_1	0
+PSM	FQSESCPVVGMSR	30	KIF1A_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0372096080389207	39.28	6-UNIMOD:4,11-UNIMOD:35,11-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	2	751.50824	750.3345085	ms_run[1]:273	K	S	921	933	SII_502_1	0
+PSM	MYLGYEYVTAIR	86	TRFE_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.071911931215216	36.34	null	null	2	740.60277	739.8710305	ms_run[1]:792	K	N	332	343	SII_54_1	0
+PSM	MPLENLEEEGLPK	87	PSMD6_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	12.2909637094405	13.92	1-UNIMOD:35,1-[PSI-MS, MS:1001524, fragment neutral loss, 0]	null	2	756.92784	757.87396	ms_run[1]:6	-	N	1	13	SII_672_1	0
+PSM	VKVDNQHDFQDIASVVALTK	88	SYN1_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0306462917508304	39.17	null	null	3	742.76993	743.062095666667	ms_run[1]:637	K	T	280	299	SII_728_1	0
+PSM	MHSMNGFMYGNQPGLTMCK	406	CERU_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	13.1093717310857	12.73	1-UNIMOD:35,1-[PSI-MS, MS:1001524, fragment neutral loss, 63.998285],4-UNIMOD:35,4-[PSI-MS, MS:1001524, fragment neutral loss, 63.998285],8-UNIMOD:35,8-[PSI-MS, MS:1001524, fragment neutral loss, 63.998285],18-UNIMOD:4	null	3	752.11041	751.306902666667	ms_run[1]:186	K	G	620	638	SII_870_2	0
+PSM	PFLELDTNLPANR	407	DDTL_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	5.61449311746148E-7	87.49	null	null	2	751.26385	750.3962605	ms_run[1]:281	M	V	2	14	SII_493_1	0
+PSM	SANLVAATLGAILNR	408	HXK1_HUMAN	null	SwissProt_57.15.fasta	SwissProt_57.15.fasta	[MS, MS:1001207, Mascot, ]	0.0162532870439355	42.8	null	null	2	742.99991	742.4331715	ms_run[1]:654	R	L	382	396	SII_136_1	0

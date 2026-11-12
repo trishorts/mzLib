@@ -45,7 +45,9 @@ namespace Readers
         FlashLFQQuantifiedOligo,
         DiaNnReportParquet,
         DiaPrecursorTsv,
-        DiaPeptideTsv
+        DiaPeptideTsv,
+        MzTab,
+        MzTabGz
     }
 
     public static class SupportedFileTypeExtensions
@@ -116,6 +118,9 @@ namespace Readers
                 // MetaMorpheus's DIA precursor and peptide tables, recognized by the names MetaMorpheus gives them
                 SupportedFileType.DiaPrecursorTsv => "AllDiaPrecursors.tsv",
                 SupportedFileType.DiaPeptideTsv => "AllDiaPeptides.tsv",
+                // The same extension as CasanovoMzTab: ParseFileType tells them apart by content
+                SupportedFileType.MzTab => ".mztab",
+                SupportedFileType.MzTabGz => ".mztab.gz",
                 _ => throw new MzLibException("File type not supported")
             };
         }
@@ -267,6 +272,9 @@ namespace Readers
                     // what precedes it. PRIDE serves most mzIdentML compressed.
                     if (filePath.EndsWith(SupportedFileType.MzIdentMLGz.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
                         return SupportedFileType.MzIdentMLGz;
+                    // PRIDE serves mzTab compressed too. Its version is read through the gzip, as for a plain .mztab.
+                    if (filePath.EndsWith(SupportedFileType.MzTabGz.GetFileExtension(), StringComparison.InvariantCultureIgnoreCase))
+                        return MzTabFile.DetectFileType(filePath);
                     throw new MzLibException("Gz file type not supported");
 
                 case ".parquet":
@@ -286,7 +294,8 @@ namespace Readers
                                 return SupportedFileType.CasanovoMzTab;
                         }
                     }
-                    throw new MzLibException("MzTab file type not supported");
+                    // Any other mzTab 1.0 file, from its mzTab-version; mzTab-M and pre-1.0 files throw
+                    return MzTabFile.DetectFileType(filePath);
 
                 default:
                     throw new MzLibException("File type not supported");
@@ -345,6 +354,8 @@ namespace Readers
                 SupportedFileType.DiaNnReportParquet => typeof(DiaNnParquetReportFile),
                 SupportedFileType.DiaPrecursorTsv => typeof(DiaPrecursorFile),
                 SupportedFileType.DiaPeptideTsv => typeof(DiaPeptideFile),
+                SupportedFileType.MzTab => typeof(MzTabFile),
+                SupportedFileType.MzTabGz => typeof(MzTabFile),
                 _ => throw new MzLibException("File type not supported")
             };
         }
