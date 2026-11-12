@@ -1,0 +1,58 @@
+MTD	mzTab-version	1.0
+MTD	mzTab-mode	Complete
+MTD	mzTab-type	Identification
+MTD	mzTab-ID	RESULT-00000
+MTD	title	no assay title provided (mzIdentML)
+MTD	description	Spectrum Identification Protocol: Enzymes - Trypsin; Database Filters -
+MTD	software[1]	[PSI-MS, MS:1000650, Proteome Discoverer, 2.5.0.400]
+MTD	software[1]-setting[1]	no threshold
+MTD	protein_search_engine_score[1]	[MS, MS:1001153, search engine specific score, ]
+MTD	psm_search_engine_score[1]	[MS, MS:1001155, SEQUEST:xcorr, ]
+MTD	psm_search_engine_score[2]	[MS, MS:1001156, SEQUEST:deltacn, ]
+MTD	uri[1]	http://www.ebi.ac.uk/pride/archive/assays/rs240609_1505_KY_10plex_01
+MTD	fixed_mod[1]	[MS, MS:1002453, No fixed modifications searched, ]
+MTD	variable_mod[1]	[MS, MS:1002454, No variable modifications searched, ]
+MTD	ms_run[1]-format	[PSI-MS, MS:1000584, mzML format, ]
+MTD	ms_run[1]-location	file://MSV000096151/peak/rs240609_1505_KY_10plex_01.mzML
+MTD	ms_run[1]-id_format	[PSI-MS, MS:1000776, scan number only nativeID format, ]
+MTD	custom[1]	[, , Date of export, Tue Oct 22 06:07:41 PDT 2024]
+MTD	custom[2]	[, , Original converted file, /scratch/ccms-massive/9c9f6b7178314446b9f7aabc5080981c/convertResult_0/uploads/kyammine/RESULT-00000.mzid]
+
+COM	Only variable modifications can be reported when the original source is a MZIdentML XML file
+
+PRH	accession	description	taxid	species	database	database_version	search_engine	best_search_engine_score[1]	search_engine_score[1]_ms_run[1]	num_psms_ms_run[1]	num_peptides_distinct_ms_run[1]	num_peptides_unique_ms_run[1]	ambiguity_members	modifications	protein_coverage
+PRT	M0R019	Heterogeneous nuclear ribonucleoprotein M (Fragment) OS=Homo sapiens OX=9606 GN=HNRNPM PE=1 SV=8	null	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	null	null	3	null	null	null	null	null
+PRT	P02533	Keratin, type I cytoskeletal 14 OS=Homo sapiens OX=9606 GN=KRT14 PE=1 SV=4	null	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	null	null	104	null	null	null	272-UNIMOD:35,273-UNIMOD:35	null
+PRT	A0A7I2V535	Non-POU domain containing octamer binding OS=Homo sapiens OX=9606 GN=NONO PE=1 SV=1	null	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	null	null	10	null	null	null	null	null
+
+PSH	sequence	PSM_ID	accession	unique	database	database_version	search_engine	search_engine_score[1]	search_engine_score[2]	modifications	retention_time	charge	exp_mass_to_charge	calc_mass_to_charge	spectra_ref	pre	post	start	end	opt_global_mzidentml_original_ID	opt_global_cv_MS:1002217_decoy_peptide	opt_global_cv_PRIDE:0000091_rank	opt_global_pass_threshold	opt_global_valid	opt_global_invalid_reason	opt_global_cv_MS:1002354_PSM-level_q-value
+PSM	AFITNIPFDVK	1	M0R019	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.93	0.0	11-UNIMOD:737,1-UNIMOD:737	null	2	862.013278647806	862.013370325	ms_run[1]:scan=23239	null	null	73	83	SII_23239_128935_1	0	1	true	VALID	null	null
+PSM	AAEVLNK	2	M0R019	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.92	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	601.878917620927	601.879085285	ms_run[1]:scan=8342	null	null	128	134	SII_8342_38828_1	0	1	true	VALID	null	null
+PSM	AFITNIPFDVK	3	M0R019	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	3.07	0.0	11-UNIMOD:737,1-UNIMOD:737	null	2	862.013701094367	862.013370325	ms_run[1]:scan=23248	null	null	73	83	SII_23248_128983_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	223	232	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	192	201	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P08779	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	225	234	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	DAEEWFFTK	5	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.61	0.0	9-UNIMOD:737,1-UNIMOD:737	null	3	544.287571715386	544.288761093333	ms_run[1]:scan=20966	null	null	301	309	SII_20966_115570_1	0	1	true	VALID	null	null
+PSM	EVATNSELVQSGK	6	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	3.54	0.0	13-UNIMOD:737,1-UNIMOD:737	null	3	607.344302584369	607.343705523333	ms_run[1]:scan=8629	null	null	316	328	SII_8629_40681_1	0	1	true	VALID	null	null
+PSM	EVATNSELVQSGK	6	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	3.54	0.0	13-UNIMOD:737,1-UNIMOD:737	null	3	607.344302584369	607.343705523333	ms_run[1]:scan=8629	null	null	285	297	SII_8629_40681_1	0	1	true	VALID	null	null
+PSM	LLEGEDAHLSSSQFSSGSQSSR	7	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.96	0.0	1-UNIMOD:737	null	3	846.747074032609	846.74716892	ms_run[1]:scan=10609	null	null	418	439	SII_10609_52628_1	0	1	true	VALID	null	null
+PSM	APSTYGGGLSVSSSR	8	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.06	0.0	1-UNIMOD:737	null	3	552.292293857809	552.29144419	ms_run[1]:scan=7748	null	null	42	56	SII_7748_35106_1	0	1	true	VALID	null	null
+PSM	LASYLDK	9	A0A1B0GVI3	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.88	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	634.385681302802	634.38674313	ms_run[1]:scan=13578	null	null	157	163	SII_13578_70864_1	0	1	true	VALID	null	null
+PSM	LASYLDK	9	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.88	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	634.385681302802	634.38674313	ms_run[1]:scan=13578	null	null	126	132	SII_13578_70864_1	0	1	true	VALID	null	null
+PSM	LASYLDK	9	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.88	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	634.385681302802	634.38674313	ms_run[1]:scan=13578	null	null	95	101	SII_13578_70864_1	0	1	true	VALID	null	null
+PSM	LASYLDK	9	P35527	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.88	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	634.385681302802	634.38674313	ms_run[1]:scan=13578	null	null	164	170	SII_13578_70864_1	0	1	true	VALID	null	null
+PSM	LASYLDK	9	P08779	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.88	0.0	7-UNIMOD:737,1-UNIMOD:737	null	2	634.385681302802	634.38674313	ms_run[1]:scan=13578	null	null	128	134	SII_13578_70864_1	0	1	true	VALID	null	null
+PSM	SLLEGEGSSGGGGR	358	A0A1B0GVI3	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.19	0.0	1-UNIMOD:737	null	2	746.3842118125	746.383670975	ms_run[1]:scan=7108	null	null	451	464	SII_7108_31138_1	0	1	true	VALID	null	null
+PSM	KDAEAWFNEK	359	A0A1B0GVI3	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.64	0.0	1-UNIMOD:737,10-UNIMOD:737,1-UNIMOD:737	null	3	642.364722067048	642.36270903	ms_run[1]:scan=12736	null	null	334	343	SII_12736_65909_1	0	1	true	VALID	null	null
+PSM	KDAEAWFNEK	360	A0A1B0GVI3	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.64	0.0	10-UNIMOD:737,1-UNIMOD:737	null	2	848.459525004382	848.45895923	ms_run[1]:scan=10625	null	null	334	343	SII_10625_52744_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	223	232	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	192	201	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P08779	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	225	234	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	EVFTSSSSSSSR	361	P08779	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	3.21	0.0	1-UNIMOD:737	null	2	745.369954863305	745.370229245	ms_run[1]:scan=5352	null	null	442	453	SII_5352_20229_1	0	1	true	VALID	null	null
+PSM	IEEELGSK	616	A0A2R8Y6G6	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	3.04	0.0	8-UNIMOD:737,1-UNIMOD:737	null	2	681.897459256842	681.897671905	ms_run[1]:scan=11184	null	null	413	420	SII_11184_56112_1	0	1	true	VALID	null	null
+PSM	IEEELGSK	617	A0A2R8Y6G6	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.7	0.0	8-UNIMOD:737,1-UNIMOD:737	null	2	681.89757873577	681.897671905	ms_run[1]:scan=11190	null	null	413	420	SII_11190_56144_1	0	1	true	VALID	null	null
+PSM	YISPDQLADLYK	618	A0A2R8Y6G6	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.1	0.0	12-UNIMOD:737,1-UNIMOD:737	null	2	942.530536876248	942.52958143	ms_run[1]:scan=21517	null	null	270	281	SII_21517_118912_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P02533	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	223	232	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	192	201	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	RVLDELTLAR	4	P08779	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	4.13	0.0	1-UNIMOD:737	null	3	472.289718029238	472.290827416667	ms_run[1]:scan=13064	null	null	225	234	SII_13064_67896_1	0	1	true	VALID	null	null
+PSM	TIEELQNK	619	Q04695	null	contaminants_for_human_database.fasta; uniprot_Human_230605.fasta.fasta	null	[MS, MS:1001208, SEQUEST, ]	2.22	0.0	8-UNIMOD:737,1-UNIMOD:737	null	2	716.923624870035	716.924220995	ms_run[1]:scan=9775	null	null	137	144	SII_9775_47926_1	0	1	true	VALID	null	null

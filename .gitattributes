@@ -94,3 +94,12 @@ mzLib/Test/DataFiles/Ontologies/*.xml -text
 ###############################################################################
 mzLib/Test/DataFiles/PXD*.mzid -text
 mzLib/Test/DataFiles/PXD*.mzid.gz binary
+
+###############################################################################
+# mzTab fixtures from public deposits and test suites, cut to whole original
+# lines, see mzLib/Test/FileReadingTests/ExternalFileTypes/MzTab/MZTAB_PROVENANCE.md.
+# The MaxQuant excerpt is CRLF and the others LF, as published; the mzML is the
+# OpenMS input, whole.
+###############################################################################
+mzLib/Test/FileReadingTests/ExternalFileTypes/MzTab/*.mzTab -text
+mzLib/Test/FileReadingTests/ExternalFileTypes/MzTab/*.mzML -text

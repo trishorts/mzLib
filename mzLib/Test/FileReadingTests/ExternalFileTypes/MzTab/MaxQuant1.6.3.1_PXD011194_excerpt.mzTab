@@ -1,0 +1,198 @@
+MTD	mzTab-version	1.0.0
+MTD	mzTab-mode	Complete
+MTD	mzTab-type	Identification
+MTD	title	null
+MTD	description	null
+MTD	software[1]	[MS, MS:1001583, MaxQuant,1.6.3.1]
+COM	[, CHEMMOD:57.0214637236, Carbamidomethyl (C),]	
+MTD	fixed_mod[1]	[, , CHEMMOD:57.0214637236,]
+MTD	fixed_mod[1]-site	C
+MTD	fixed_mod[1]-position	Anywhere
+COM	[, CHEMMOD:15.9949146221, Oxidation (M),]	
+MTD	variable_mod[1]	[, , CHEMMOD:15.9949146221,]
+MTD	variable_mod[1]-site	M
+MTD	variable_mod[1]-position	Anywhere
+COM	[, CHEMMOD:42.0105646863, Acetyl (Protein N-term),]	
+MTD	variable_mod[2]	[, , CHEMMOD:42.0105646863,]
+MTD	variable_mod[2]-site	N-term
+MTD	variable_mod[2]-position	Protein N-term
+MTD	protein_search_engine_score[1]	[MS, MS:1002375, protein group-level combined FDRscore, ]
+MTD	peptide_search_engine_score[1]	[MS, MS:1001250, local FDR, ]
+MTD	psm_search_engine_score[1]	[MS, MS:1002338, Andromeda:score,  ]
+MTD	psm_search_engine_score[2]	[MS, MS:1002995, Andromeda:PEP,  ]
+MTD	ms_run[1]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[1]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_0.apl
+MTD	ms_run[1]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[2]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[2]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_1.apl
+MTD	ms_run[2]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[3]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[3]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_2.apl
+MTD	ms_run[3]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[4]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[4]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_3.apl
+MTD	ms_run[4]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[5]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[5]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_4.apl
+MTD	ms_run[5]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[6]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[6]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_5.apl
+MTD	ms_run[6]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[7]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[7]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_6.apl
+MTD	ms_run[7]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[8]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[8]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_7.apl
+MTD	ms_run[8]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[9]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[9]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_8.apl
+MTD	ms_run[9]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[10]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[10]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_9.apl
+MTD	ms_run[10]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[11]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[11]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_10.apl
+MTD	ms_run[11]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[12]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[12]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_11.apl
+MTD	ms_run[12]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[13]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[13]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_12.apl
+MTD	ms_run[13]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[14]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[14]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_13.apl
+MTD	ms_run[14]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[15]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[15]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.secpep.sil0_14.apl
+MTD	ms_run[15]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[16]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[16]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_0.apl
+MTD	ms_run[16]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[17]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[17]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_1.apl
+MTD	ms_run[17]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[18]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[18]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_2.apl
+MTD	ms_run[18]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[19]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[19]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_3.apl
+MTD	ms_run[19]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[20]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[20]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_4.apl
+MTD	ms_run[20]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[21]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[21]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_5.apl
+MTD	ms_run[21]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[22]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[22]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_6.apl
+MTD	ms_run[22]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[23]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[23]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_7.apl
+MTD	ms_run[23]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[24]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[24]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_8.apl
+MTD	ms_run[24]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[25]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[25]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_9.apl
+MTD	ms_run[25]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[26]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[26]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_10.apl
+MTD	ms_run[26]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[27]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[27]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_11.apl
+MTD	ms_run[27]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+MTD	ms_run[28]-format	[MS, MS:1002996, Andromeda:apl file format, ]
+MTD	ms_run[28]-location	file://c:/users/user/desktop/usb/data/practical_i/label_free_proteome/combined/andromeda/allspectra.cid.itms.iso_12.apl
+MTD	ms_run[28]-id_format	[MS, MS:1000776, scan number only nativeID format, ]
+
+PRH	accession	description	taxid	species	database	database_version	search_engine	best_search_engine_score[1]	search_engine_score[1]_ms_run[1]	search_engine_score[1]_ms_run[2]	search_engine_score[1]_ms_run[3]	search_engine_score[1]_ms_run[4]	search_engine_score[1]_ms_run[5]	search_engine_score[1]_ms_run[6]	search_engine_score[1]_ms_run[7]	search_engine_score[1]_ms_run[8]	search_engine_score[1]_ms_run[9]	search_engine_score[1]_ms_run[10]	search_engine_score[1]_ms_run[11]	search_engine_score[1]_ms_run[12]	search_engine_score[1]_ms_run[13]	search_engine_score[1]_ms_run[14]	search_engine_score[1]_ms_run[15]	search_engine_score[1]_ms_run[16]	search_engine_score[1]_ms_run[17]	search_engine_score[1]_ms_run[18]	search_engine_score[1]_ms_run[19]	search_engine_score[1]_ms_run[20]	search_engine_score[1]_ms_run[21]	search_engine_score[1]_ms_run[22]	search_engine_score[1]_ms_run[23]	search_engine_score[1]_ms_run[24]	search_engine_score[1]_ms_run[25]	search_engine_score[1]_ms_run[26]	search_engine_score[1]_ms_run[27]	search_engine_score[1]_ms_run[28]	num_psms_ms_run[1]	num_psms_ms_run[2]	num_psms_ms_run[3]	num_psms_ms_run[4]	num_psms_ms_run[5]	num_psms_ms_run[6]	num_psms_ms_run[7]	num_psms_ms_run[8]	num_psms_ms_run[9]	num_psms_ms_run[10]	num_psms_ms_run[11]	num_psms_ms_run[12]	num_psms_ms_run[13]	num_psms_ms_run[14]	num_psms_ms_run[15]	num_psms_ms_run[16]	num_psms_ms_run[17]	num_psms_ms_run[18]	num_psms_ms_run[19]	num_psms_ms_run[20]	num_psms_ms_run[21]	num_psms_ms_run[22]	num_psms_ms_run[23]	num_psms_ms_run[24]	num_psms_ms_run[25]	num_psms_ms_run[26]	num_psms_ms_run[27]	num_psms_ms_run[28]	num_peptides_distinct_ms_run[1]	num_peptides_distinct_ms_run[2]	num_peptides_distinct_ms_run[3]	num_peptides_distinct_ms_run[4]	num_peptides_distinct_ms_run[5]	num_peptides_distinct_ms_run[6]	num_peptides_distinct_ms_run[7]	num_peptides_distinct_ms_run[8]	num_peptides_distinct_ms_run[9]	num_peptides_distinct_ms_run[10]	num_peptides_distinct_ms_run[11]	num_peptides_distinct_ms_run[12]	num_peptides_distinct_ms_run[13]	num_peptides_distinct_ms_run[14]	num_peptides_distinct_ms_run[15]	num_peptides_distinct_ms_run[16]	num_peptides_distinct_ms_run[17]	num_peptides_distinct_ms_run[18]	num_peptides_distinct_ms_run[19]	num_peptides_distinct_ms_run[20]	num_peptides_distinct_ms_run[21]	num_peptides_distinct_ms_run[22]	num_peptides_distinct_ms_run[23]	num_peptides_distinct_ms_run[24]	num_peptides_distinct_ms_run[25]	num_peptides_distinct_ms_run[26]	num_peptides_distinct_ms_run[27]	num_peptides_distinct_ms_run[28]	num_peptides_unique_ms_run[1]	num_peptides_unique_ms_run[2]	num_peptides_unique_ms_run[3]	num_peptides_unique_ms_run[4]	num_peptides_unique_ms_run[5]	num_peptides_unique_ms_run[6]	num_peptides_unique_ms_run[7]	num_peptides_unique_ms_run[8]	num_peptides_unique_ms_run[9]	num_peptides_unique_ms_run[10]	num_peptides_unique_ms_run[11]	num_peptides_unique_ms_run[12]	num_peptides_unique_ms_run[13]	num_peptides_unique_ms_run[14]	num_peptides_unique_ms_run[15]	num_peptides_unique_ms_run[16]	num_peptides_unique_ms_run[17]	num_peptides_unique_ms_run[18]	num_peptides_unique_ms_run[19]	num_peptides_unique_ms_run[20]	num_peptides_unique_ms_run[21]	num_peptides_unique_ms_run[22]	num_peptides_unique_ms_run[23]	num_peptides_unique_ms_run[24]	num_peptides_unique_ms_run[25]	num_peptides_unique_ms_run[26]	num_peptides_unique_ms_run[27]	num_peptides_unique_ms_run[28]	ambiguity_members	modifications	protein_coverage	opt_global_cv_MS:1002217_decoy_peptide 
+PRT	CON__P00761	null	null	null	null	null	[MS, MS:1002337, Andromeda, 1.6.3.1]	114.1956988017	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	CON__P00761	94-CHEMMOD:15.9949146221	0.329	0
+PRT	CON__P02533	null	null	null	null	null	[MS, MS:1002337, Andromeda, 1.6.3.1]	10.6272146902032	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	CON__P02533, CON__A2A4G1, CON__P08727, CON__P19001, CON__Q04695, CON__Q9QWL7, CON__P08730-1, CON__P19012, CON__P05784, CON__Q148H6, CON__Q9Z2K1, CON__Q3ZAW8, CON__Q7Z3Y7, CON__Q99456, CON__Q14525, CON__Q9UE12, CON__Q15323, CON__A2A5Y0, CON__ENSEMBL:ENSP00000377550, CON__Q92764, CON__Q14532, CON__Q7Z3Z0, CON__Q6IFX2, CON__A2AB72, CON__Q497I4, CON__O76015, CON__Q7Z3Y8, CON__O76013, CON__Q7Z3Y9, CON__O76014, CON__REFSEQ:XP_986630, CON__Q2M2I5	null	0.108	0
+PRT	CON__P02538	null	null	null	null	null	[MS, MS:1002337, Andromeda, 1.6.3.1]	7.31200957688862	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	null	CON__P02538	null	0.163	0
+
+PSH	sequence	PSM_ID	accession	unique	database	database_version	search_engine	search_engine_score[1]	search_engine_score[2]	modifications	retention_time	charge	exp_mass_to_charge	calc_mass_to_charge	spectra_ref	pre	post	start	end	opt_global_cv_MS:1000776_scan_number_only_nativeID_format	opt_global_cv_MS:1002217_decoy_peptide 
+PSM	AAAALAGGK	1	Q3E792	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	85.2649238978181	0.00435090582173548	null	8.10443210601807	2	365.216522216797	365.21632	ms_run[16]:index=3508	K	K	13	21	995	0
+PSM	AAAALAGGK	1	P0C0T4	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	85.2649238978181	0.00435090582173548	null	8.10443210601807	2	365.216522216797	365.21632	ms_run[16]:index=3508	K	K	13	21	995	0
+PSM	AAAALAGGKK	2	Q3E792	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	130.76542239967	0.000413283252287176	null	6.22069311141968	2	429.261962890625	429.2638	ms_run[16]:index=8349	K	S	13	22	619	0
+PSM	AAAALAGGKK	2	P0C0T4	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	130.76542239967	0.000413283252287176	null	6.22069311141968	2	429.261962890625	429.2638	ms_run[16]:index=8349	K	S	13	22	619	0
+PSM	AAAALAGGKK	3	Q3E792	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	107.593601261285	0.00154221334919835	null	6.08160352706909	2	429.264862060547	429.2638	ms_run[16]:index=8350	K	S	13	22	796	0
+PSM	AAAALAGGKK	3	P0C0T4	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	107.593601261285	0.00154221334919835	null	6.08160352706909	2	429.264862060547	429.2638	ms_run[16]:index=8350	K	S	13	22	796	0
+PSM	AAAEDTAKDNYGK	4	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	48.6592096076663	0.0232972900349254	null	7.55862855911255	3	451.879516601563	451.88088	ms_run[18]:index=7490	K	L	65	77	892	0
+PSM	AAAEDTAKDNYGK	5	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	42.8093972797367	0.0358855841524466	null	6.98635482788086	3	451.880554199219	451.88088	ms_run[18]:index=7491	K	L	65	77	655	0
+PSM	AAAEDTAKDNYGK	6	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	73.2733118128261	0.00247183670739824	null	6.82728338241577	3	451.880584716797	451.88088	ms_run[18]:index=7494	K	L	65	77	951	0
+PSM	AAAEDTAKDNYGK	7	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	55.4521948315776	0.00867936878533276	null	6.89843988418579	3	451.881103515625	451.88088	ms_run[18]:index=7492	K	L	65	77	713	0
+PSM	AAAEDTAKDNYGK	8	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	39.2656731692429	0.0435113743271608	null	6.82513666152954	3	451.881011962891	451.88088	ms_run[18]:index=7493	K	L	65	77	686	0
+PSM	AAAEDTAKDNYGK	9	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	59.5696580359643	0.005767936158661	null	6.92762994766235	3	451.881530761719	451.88088	ms_run[18]:index=7489	K	L	65	77	781	0
+PSM	AAAEDTAKDNYGKLPLIQSR	10	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	88.7813969262216	2.69042404769352E-05	null	45.039680480957	3	721.38330078125	721.04644	ms_run[21]:index=5872	K	D	65	84	7440	0
+PSM	AAAEDTAKDNYGKLPLIQSR	11	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	39.923281710081	0.0232902039529871	null	45.0699310302734	4	541.288696289063	541.03665	ms_run[21]:index=5875	K	D	65	84	7445	0
+PSM	AAAEDTAKDNYGKLPLIQSR	12	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	119.800031432643	1.31553921192307E-07	null	41.9559288024902	3	721.382385253906	721.04644	ms_run[21]:index=5874	K	D	65	84	6766	0
+PSM	AAAEDTAKDNYGKLPLIQSR	13	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	48.1117559509382	0.0123915778758327	null	42.1499481201172	4	541.288330078125	541.03665	ms_run[21]:index=5879	K	D	65	84	6798	0
+PSM	AAAEDTAKDNYGKLPLIQSR	14	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	96.012434715022	1.57633023124328E-05	null	41.321662902832	3	721.045837402344	721.04644	ms_run[21]:index=5876	K	D	65	84	7062	0
+PSM	AAAEDTAKDNYGKLPLIQSR	15	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	129.417661585378	1.80689315727699E-08	null	42.3812713623047	3	721.381103515625	721.04644	ms_run[21]:index=5877	K	D	65	84	6905	0
+PSM	AAAEDTAKDNYGKLPLIQSR	16	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	60.0343361537473	0.00110146883908322	null	42.4476356506348	4	541.287719726563	541.03665	ms_run[21]:index=5881	K	D	65	84	6916	0
+PSM	AAAEDTAKDNYGKLPLIQSR	17	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	41.9881501327565	0.0205419228721263	null	40.7366256713867	4	541.28857421875	541.03665	ms_run[21]:index=5873	K	D	65	84	6604	0
+PSM	AAAEDTAKDNYGKLPLIQSR	18	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	54.5110008361457	0.00788207123661416	null	41.0161666870117	3	721.048767089844	721.04644	ms_run[21]:index=5871	K	D	65	84	6651	0
+PSM	AAAEDTAKDNYGKLPLIQSR	19	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	39.5854782634251	0.0237398107227448	null	39.9470901489258	4	541.288940429688	541.03665	ms_run[21]:index=5880	K	D	65	84	6656	0
+PSM	AAAEDTAKDNYGKLPLIQSR	20	P04802	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	54.2530725312575	0.00858047661907066	null	40.1334037780762	3	721.383605957031	721.04644	ms_run[21]:index=5882	K	D	65	84	6688	0
+PSM	AAAEGVANLHLDEATGEMVSK	21	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	67.9280215305304	0.000584120945267937	null	57.3094329833984	3	705.349365234375	705.01252	ms_run[21]:index=4663	K	S	9	29	9530	0
+PSM	AAAEGVANLHLDEATGEMVSK	22	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	181.687577925981	1.4085059996774E-14	null	57.4267959594727	2	1057.5205078125	1057.0151	ms_run[21]:index=4665	K	S	9	29	9551	0
+PSM	AAAEGVANLHLDEATGEMVSK	23	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	78.2247494139292	0.000140507327318605	null	54.2596893310547	3	705.347473144531	705.01252	ms_run[21]:index=4662	K	S	9	29	8852	0
+PSM	AAAEGVANLHLDEATGEMVSK	24	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	105.377873226816	3.10055880229777E-07	null	53.7902069091797	3	705.01220703125	705.01252	ms_run[21]:index=4664	K	S	9	29	9233	0
+PSM	AAAEGVANLHLDEATGEMVSK	25	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	117.293499555393	2.2079758011217E-08	null	54.5362968444824	3	705.347534179688	705.01252	ms_run[21]:index=4666	K	S	9	29	8965	0
+PSM	AAAEGVANLHLDEATGEMVSK	26	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	35.0233500652801	0.0294860327289374	null	52.5868492126465	3	705.015502929688	705.01252	ms_run[21]:index=4668	K	S	9	29	8622	0
+PSM	AAAEGVANLHLDEATGEMVSK	27	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	89.6688934376541	6.58799694870283E-06	null	52.3558082580566	3	705.346130371094	705.01252	ms_run[21]:index=4667	K	S	9	29	8803	0
+PSM	AAAEGVANLHLDEATGEMVSK	28	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	92.4736359461281	2.0961178463533E-06	18-CHEMMOD:15.9949146221	44.1601867675781	3	710.346313476563	710.34416	ms_run[5]:index=10727	K	S	9	29	7148	0
+PSM	AAAEGVANLHLDEATGEMVSK	29	P15180	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	79.8799528559224	7.14561275380774E-05	18-CHEMMOD:15.9949146221	43.2938385009766	3	710.682983398438	710.34416	ms_run[21]:index=5043	K	S	9	29	7031	0
+PSM	AAALVNK	30	P05030	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	66.9935322237189	0.0330376961018696	null	8.70210838317871	2	343.713012695313	343.71341	ms_run[16]:index=2261	R	A	272	278	1112	0
+PSM	AAALVNK	30	P19657	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	66.9935322237189	0.0330376961018696	null	8.70210838317871	2	343.713012695313	343.71341	ms_run[16]:index=2261	R	A	272	278	1112	0
+PSM	AAALVNK	31	P05030	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	87.5817098841927	0.012865027648524	null	7.91191339492798	2	343.713592529297	343.71341	ms_run[16]:index=2268	R	A	272	278	837	0
+PSM	AAALVNK	31	P19657	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	87.5817098841927	0.012865027648524	null	7.91191339492798	2	343.713592529297	343.71341	ms_run[16]:index=2268	R	A	272	278	837	0
+PSM	AAAPTVVFLDELDSIAK	32	P25694	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	135.715223529939	3.63209399579628E-08	null	110.16374206543	3	587.322204589844	587.32073	ms_run[20]:index=2341	R	A	578	594	17745	0
+PSM	AAAPTVVFLDELDSIAK	33	P25694	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	58.0403200967161	0.00256258126360422	null	109.217651367188	2	880.983215332031	880.47746	ms_run[20]:index=2340	R	A	578	594	17060	0
+PSM	AAAPTVVFLDELDSIAK	34	P25694	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	105.137154204863	8.47798075365612E-06	null	109.238830566406	3	587.323181152344	587.32073	ms_run[20]:index=2338	R	A	578	594	17063	0
+PSM	AAAPTVVFLDELDSIAK	35	P25694	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	90.7253642953833	5.96272043258992E-05	null	109.504753112793	3	587.656066894531	587.32073	ms_run[20]:index=2337	R	A	578	594	18034	0
+PSM	AACLVQNGIATWFPLAVTK	58	P33892	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	94.7167726840349	2.31047736931147E-05	null	106.252479553223	2	1031.056640625	1030.5535	ms_run[21]:index=3182	K	L	830	848	17568	0
+PSM	ACDDKIMYVDYK	299	P00549	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	91.9612243772161	0.000525098462425574	7-CHEMMOD:15.9949146221	31.2472648620605	3	513.228454589844	512.89515	ms_run[19]:index=3888	K	N	120	131	5074	0
+PSM	ADFLLRPIK	374	P38768	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	114.894365208243	0.000607325169216663	0-CHEMMOD:42.0105646863	83.9362716674805	2	557.836669921875	557.83459	ms_run[17]:index=6713	M	Q	2	10	13910	0
+PSM	ADFLLRPIK	375	P38768	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	76.8266680906325	0.0059108095802751	0-CHEMMOD:42.0105646863	79.8385848999023	2	557.835083007813	557.83459	ms_run[17]:index=6714	M	Q	2	10	12972	0
+PSM	AHLMNPMVPGLAQGGK	1279	P36421	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	45.206907608634	0.0430792363658739	4-CHEMMOD:15.9949146221, 7-CHEMMOD:15.9949146221	30.769702911377	3	551.615478515625	551.61309	ms_run[19]:index=9502	R	M	212	227	4909	0
+PSM	AHLMNPMVPGLAQGGK	1280	P36421	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	45.206907608634	0.0298956258175874	4-CHEMMOD:15.9949146221, 7-CHEMMOD:15.9949146221	32.3511161804199	3	552.272705078125	551.61309	ms_run[4]:index=7711	R	M	212	227	5183	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P02533	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__A2A4G1	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P08727	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P19001	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q04695	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q9QWL7	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P08730-1	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P19012	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__P05784	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q148H6	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q9Z2K1	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q3ZAW8	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q7Z3Y7	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q99456	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q14525	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q9UE12	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q15323	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__A2A5Y0	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__ENSEMBL:ENSP00000377550	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q92764	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q14532	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q7Z3Z0	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q6IFX2	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__A2AB72	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q497I4	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__O76015	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q7Z3Y8	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__O76013	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q7Z3Y9	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__O76014	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__REFSEQ:XP_986630	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	APSTYGGGLSVSSSR	2877	CON__Q2M2I5	0	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	178.954223965687	5.2559209989938E-12	null	25.0823822021484	2	713.352600097656	713.35206	ms_run[18]:index=11535	R	F	42	56	4072	0
+PSM	DLKYTELQLNVPK	5223	REV__Q06822	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	90.1503935841052	0.00197857702743297	null	95.3801193237305	2	780.937133789063	780.93523	ms_run[19]:index=5220	null	null	null	null	15599	1
+PSM	DLLCVNENLIK	5224	P25558	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	64.6535936663856	0.0467450183656203	null	70.8572769165039	2	665.992797851563	665.85539	ms_run[3]:index=8223	K	N	728	738	11566	0
+PSM	DLLCVNENLIK	5225	P25558	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	121.829908730423	4.26235024587186E-05	null	70.9067687988281	2	665.853881835938	665.85539	ms_run[18]:index=6215	K	N	728	738	12159	0
+PSM	DLLENEQFLR	5226	P53629	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	69.953536698905	0.00902952731725485	null	71.8169097900391	2	638.825805664063	638.83023	ms_run[18]:index=2324	K	I	6	15	11984	0
+PSM	GSVEIENEALIR	12687	REV__P43561	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	28.8057677212291	0.0585104707499406	null	15.6240282058716	4	333.181060791016	333.18068	ms_run[18]:index=6122	null	null	null	null	2313	1
+PSM	MAAIRDYK	26723	P38697	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	43.0001541544104	0.0388710267049868	1-CHEMMOD:15.9949146221, 0-CHEMMOD:42.0105646863	21.9561100006104	2	512.283996582031	513.25786	ms_run[2]:index=7254	-	T	1	8	3517	0
+PSM	MAALSVVDR	26724	Q08972	1	null	null	[MS, MS:1002338, Andromeda:score, 1.6.3.1]	61.6788557194378	0.0202046910240288	1-CHEMMOD:15.9949146221	23.8685722351074	2	489.256408691406	489.25786	ms_run[16]:index=15262	K	I	285	293	4043	0
