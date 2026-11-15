@@ -157,6 +157,12 @@ public sealed record SetHypothesisPart
     public required IReadOnlyList<string> Members { get; init; }
     /// <summary>The dataset contrasts, in file order.</summary>
     public required IReadOnlyList<SetDatasetContrast> Contrasts { get; init; }
+    /// <summary>
+    /// <see cref="SetTestFreeze.ProteinMeasure"/>, or <see cref="SetTestFreeze.ShareMeasure"/> for the <c>exon_peptide</c>
+    /// and <c>isoform_peptide</c> rows. A hypothesis part that mixes measures is split into one part per measure
+    /// (<c>DEF-DIFF-SHARE-PART</c>, ruling S5), each with its own results, verdict and place in the family.
+    /// </summary>
+    public string Measure { get; init; } = SetTestFreeze.ProteinMeasure;
 
     /// <summary>
     /// Tested as a set: kind <c>set</c>; or a label kind (AGING-D9) listing several members. Kind <c>single</c>, or a label
@@ -203,6 +209,10 @@ public sealed class SetTestFreeze
     public const string SingleKind = "single";
     /// <summary>The default <c>measure</c>.</summary>
     public const string ProteinMeasure = "protein";
+    /// <summary>The <see cref="SetHypothesisPart.Measure"/> of a part tested on an isoform's share (<c>DEF-DIFF-SHARE</c>).</summary>
+    public const string ShareMeasure = "share";
+    /// <summary>The row <c>measure</c>s tested on an isoform's share: an exon's inclusion, or one form's peptides.</summary>
+    public static readonly IReadOnlyList<string> ShareRowMeasures = new[] { "exon_peptide", "isoform_peptide" };
     /// <summary>A row whose <c>note</c> begins with this is a maturation row (aging's protocol, hypotheses-splicing-v2).</summary>
     public const string MaturationPrefix = "MATURATION CONTRAST";
 
@@ -449,44 +459,69 @@ public sealed class SetTestFreeze
                     $"Lines {string.Join(", ", part.Select(r => r.Line))}: {part.Key.HypothesisId} {PredictionName(part.Key.Prediction)} " +
                     $"has kinds {string.Join(" and ", kinds.Select(k => $"'{k}'"))}; one part has one kind.");
 
-            var contrasts = new List<SetDatasetContrast>();
-            foreach (var contrast in part.GroupBy(r => (r.Dataset, r.Factor, r.TestLevel, r.ReferenceLevel, ContextsKey(r.Contexts))))
+            // The flags are read over every member row of the original part, whatever its measure: a contrast is post hoc, a
+            // reproduction or maturation for both split parts if any row is (DEF-DIFF-SHARE-PART, ruling S5).
+            var flags = new Dictionary<(string, string, string, string, string), (SetIndependence Independence, bool PostHoc, bool Maturation, bool? Primary)>();
+            foreach (var contrast in part.GroupBy(ContrastKey))
             {
                 var members = contrast.ToList();
                 var primaries = members.Select(r => r.Primary).Distinct().ToList();
                 if (primaries.Count > 1)
                     throw new FormatException(
                         $"Lines {string.Join(", ", members.Select(r => r.Line))}: one dataset contrast of {part.Key.HypothesisId} " +
-                        $"{PredictionName(part.Key.Prediction)} ({contrast.Key.Dataset}) carries different 'primary' marks.");
-                contrasts.Add(new SetDatasetContrast
-                {
-                    Dataset = contrast.Key.Dataset,
-                    Factor = contrast.Key.Factor,
-                    TestLevel = contrast.Key.TestLevel,
-                    ReferenceLevel = contrast.Key.ReferenceLevel,
-                    ContextsText = members[0].ContextsText,
-                    Contexts = members[0].Contexts,
-                    Rows = members,
-                    Independence = members.All(r => r.Independence == SetIndependence.Independent) ? SetIndependence.Independent
+                        $"{PredictionName(part.Key.Prediction)} ({contrast.Key.Item1}) carries different 'primary' marks.");
+                flags[contrast.Key] = (
+                    members.All(r => r.Independence == SetIndependence.Independent) ? SetIndependence.Independent
                         : members.Any(r => r.Independence == SetIndependence.Reproduction) ? SetIndependence.Reproduction
                         : SetIndependence.NotPooled,
-                    PostHoc = members.Any(r => r.PostHoc),
-                    Maturation = members.Any(r => r.Maturation),
-                    Primary = primaries[0],
-                });
+                    members.Any(r => r.PostHoc), members.Any(r => r.Maturation), primaries[0]);
             }
 
-            parts.Add(new SetHypothesisPart
+            foreach (var measure in part.GroupBy(MeasureOf))
             {
-                HypothesisId = part.Key.HypothesisId,
-                Prediction = part.Key.Prediction,
-                Kind = kinds[0],
-                Members = part.Select(r => r.Member).Distinct(StringComparer.Ordinal).ToList(),
-                Contrasts = contrasts,
-            });
+                var contrasts = new List<SetDatasetContrast>();
+                foreach (var contrast in measure.GroupBy(ContrastKey))
+                {
+                    var members = contrast.ToList();
+                    var (independence, postHoc, maturation, primary) = flags[contrast.Key];
+                    contrasts.Add(new SetDatasetContrast
+                    {
+                        Dataset = contrast.Key.Item1,
+                        Factor = contrast.Key.Item2,
+                        TestLevel = contrast.Key.Item3,
+                        ReferenceLevel = contrast.Key.Item4,
+                        ContextsText = members[0].ContextsText,
+                        Contexts = members[0].Contexts,
+                        Rows = members,
+                        Independence = independence,
+                        PostHoc = postHoc,
+                        Maturation = maturation,
+                        Primary = primary,
+                    });
+                }
+
+                parts.Add(new SetHypothesisPart
+                {
+                    HypothesisId = part.Key.HypothesisId,
+                    Prediction = part.Key.Prediction,
+                    Kind = kinds[0],
+                    Members = measure.Select(r => r.Member).Distinct(StringComparer.Ordinal).ToList(),
+                    Contrasts = contrasts,
+                    Measure = measure.Key,
+                });
+            }
         }
         return parts;
     }
+
+    private static (string, string, string, string, string) ContrastKey(SetTestRow r) =>
+        (r.Dataset, r.Factor, r.TestLevel, r.ReferenceLevel, ContextsKey(r.Contexts));
+
+    /// <summary>The part's measure a row belongs to; an unknown <c>measure</c> is refused, naming the line.</summary>
+    private static string MeasureOf(SetTestRow r) =>
+        string.Equals(r.Measure, ProteinMeasure, StringComparison.Ordinal) ? ProteinMeasure
+        : ShareRowMeasures.Contains(r.Measure, StringComparer.Ordinal) ? ShareMeasure
+        : throw new FormatException($"Line {r.Line}: measure '{r.Measure}' is not {ProteinMeasure}, {string.Join(" or ", ShareRowMeasures)}.");
 
     /// <summary>
     /// The restriction a parsed <c>contexts</c> cell makes, written one way: factors in ordinal order, each with its distinct
