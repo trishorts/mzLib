@@ -55,12 +55,18 @@ public class SetTestShareModelTests
     private sealed record Scenario(SetContrastSetup Setup, ObservationTable Table, List<ShareMemberResult> Members,
         Func<string, string, double> Result, List<string[]> RobustWeights);
 
-    private static Scenario Load(string name)
+    private static Scenario Load(string name, bool individuals = false, string? extraSample = null)
     {
         bool set = name.StartsWith("set", StringComparison.Ordinal);
         var samples = Tsv($"settest_share_model_{name}_samples.tsv").Rows
-            .Select(c => new AnalysisSample(c[0]) { Factors = new Dictionary<string, string> { ["age group"] = c[1], ["treatment"] = c[2] } })
+            .Select(c => new AnalysisSample(c[0])
+            {
+                Factors = new Dictionary<string, string> { ["age group"] = c[1], ["treatment"] = c[2] },
+                Individual = individuals ? "mouse-" + c[0] : null,
+            })
             .ToList();
+        var designSamples = extraSample is null ? samples
+            : samples.Append(new AnalysisSample(extraSample) { Factors = new Dictionary<string, string> { ["age group"] = "old", ["treatment"] = "none" } }).ToList();
         var values = Tsv($"settest_share_model_{name}_values.tsv").Rows.Select(c => (Member: c[0], Peptide: c[1], Kind: c[2], Sample: c[3], Y: D(c[4]))).ToList();
         var runs = samples.Select(s => new ObservationRun(s.SampleId + ".raw", s.SampleId)).ToList();
         var peptides = values.GroupBy(v => (v.Member, v.Peptide))
@@ -88,7 +94,7 @@ public class SetTestShareModelTests
         double Result(string which, string column) => which == "robust"
             ? D(br.Single()[Array.IndexOf(bh, column)])
             : D(rr.Single()[Array.IndexOf(rh, column)]);
-        return new Scenario(SetContrastSetup.Build(contrast, samples, AgeSpec), table, results, Result,
+        return new Scenario(SetContrastSetup.Build(contrast, designSamples, AgeSpec), table, results, Result,
             Tsv($"settest_share_model_{name}_robust_weights.tsv").Rows);
     }
 
@@ -185,6 +191,56 @@ public class SetTestShareModelTests
             "R2's 0.01 in o1 raises the reference's change by 0.01/4, so the share effect falls by it");
     }
 
+    /// <summary>With one sample per individual, <c>(1|individual)</c> is <c>(1|sample)</c>: the same fit, named as STAT1 names it.</summary>
+    [Test]
+    public void ASingleWithIndividuals_TakesStat1sIndividualTerm()
+    {
+        var s = Load("single_balanced", individuals: true);
+        var e = FitScenario(s, robust: false);
+        Close(e.Log2Effect, s.Result("plain", "estimate"), Fit, "share effect");
+        Close(e.StandardError, s.Result("plain", "se"), Fit, "se");
+        Assert.That(e.RandomTerms, Is.EqualTo("individual"));
+    }
+
+    [Test]
+    public void APeptideWithNoValueInTheContrast_IsLeftOutOfTheModel()
+    {
+        var s = Load("single_balanced");
+        var empty = new ObservedPeptide("EMPTYPEPTIDE", "EMPTYPEPTIDE", new[] { "G1" });
+        var table = ObservationTable.Build(s.Table.Samples.Select(x => new ObservationRun(x + ".raw", x)).ToList(),
+            s.Table.Samples.Select(x => x + ".raw"),
+            s.Table.Peptides.Select((p, k) => new PeptideRunValues(p.FullSequence, p.BaseSequence, p.ProteinGroups,
+                    s.Table.Samples.Select((x, c) => (x, v: s.Table.Log2Intensity(k, c))).Where(t => double.IsFinite(t.v))
+                        .ToDictionary(t => t.x + ".raw", t => new RunValue(Math.Pow(2, t.v), ObservationState.Quantified))))
+                .Append(new PeptideRunValues("EMPTYPEPTIDE", "EMPTYPEPTIDE", new[] { "G1" }, new Dictionary<string, RunValue>())).ToList(),
+            new[] { new ProteinGroupInfo("G1", 0.001, false, false) }, QuantBasis.MsmsOnly);
+        var member = s.Members[0] with
+        {
+            Peptides = new SharePeptides
+            {
+                Markers = table.Peptides.Where(p => p.FullSequence.Contains('M')).ToList(),
+                References = table.Peptides.Where(p => !p.FullSequence.Contains('M') || p.FullSequence == "EMPTYPEPTIDE").ToList(),
+            },
+        };
+        var e = ShareModel.FitSingle(s.Setup, member, table, out _, robust: false);
+        Assert.That(e!.Peptides, Is.EqualTo((int)s.Result("plain", "peptides")));
+        Close(e.Log2Effect, s.Result("plain", "estimate"), Fit, "the same fit");
+    }
+
+    /// <summary>Each sample holds one value, so <c>(1|sample)</c> cannot be told from the residual: not run, naming why.</summary>
+    [Test]
+    public void AShareModelThatCannotBeFormed_IsNotRunNamingWhy()
+    {
+        var t = Toy(new[] { "Ga" }, "single", "down", value: (m, p, s) =>
+            (p == Marker(m) && s is "o1" or "o2" or "y1" or "y2") || (p.StartsWith("AAPEG") && s is "o3" or "o4" or "y3" or "y4")
+            || (p.StartsWith("LLN") && s is "o5" or "y5") ? null : double.NaN);
+        var o = RunToy(t);
+        Assert.That(o.ShareMembers.Single().Assignment.State, Is.EqualTo(SetMemberStateFromRow.Tested));
+        Assert.That(o.Untested, Is.EqualTo(SetVerdictName.NotRun));
+        Assert.That(o.UntestedReason, Does.StartWith(SetNotRunReason.NotConverged + ":"));
+        Assert.That(o.Test, Is.Null);
+    }
+
     // ── refusals ─────────────────────────────────────────────────────────────
 
     [Test]
@@ -204,6 +260,12 @@ public class SetTestShareModelTests
             Throws.ArgumentException.With.Message.Contains("is not a peptide of the table"));
         Assert.That(() => ShareModel.FitSingle(new SetContrastSetup { NotRun = "spans_strata" }, s.Members[0], s.Table, out _),
             Throws.ArgumentException.With.Message.Contains("not run"));
+        var weighsIntercept = s.Setup with { Contrast = new Contrast("c", "c", new[] { 1.0, 0.0 }, null, null) };
+        Assert.That(() => ShareModel.FitSingle(weighsIntercept, s.Members[0], s.Table, out _),
+            Throws.ArgumentException.With.Message.Contains("does not weigh it"));
+        var extra = Load("single_balanced", extraSample: "s99");
+        Assert.That(() => ShareModel.FitSingle(extra.Setup, extra.Members[0], extra.Table, out _),
+            Throws.ArgumentException.With.Message.Contains("no sample 's99'"));
     }
 
     [Test]
@@ -375,6 +437,8 @@ public class SetTestShareModelTests
 
         o = RunToy(Toy(new[] { "Ga" }, "single", "attenuated_down", mrna: "1.5"));
         Assert.That((o.Untested, o.UntestedReason), Is.EqualTo((SetVerdictName.NotRun, "mrna_not_usable:direction")));
+        o = RunToy(Toy(new[] { "Ga" }, "single", "attenuated_up", mrna: "-1.5"));
+        Assert.That((o.Untested, o.UntestedReason), Is.EqualTo((SetVerdictName.NotRun, "mrna_not_usable:direction")));
 
         o = RunToy(Toy(new[] { "Ga", "Gb", "Gc" }, "set", "attenuated_down", mrna: "-2"));
         Assert.That(o.Test!.MrnaMean, Is.EqualTo(-2));
@@ -389,6 +453,8 @@ public class SetTestShareModelTests
             Throws.ArgumentException.With.Message.Contains("is a protein part"));
         Assert.That(() => SetTest.Run(t.Part, t.Part.Contrasts.Single(), t.Setup, t.Resolved, t.Table, new Dictionary<string, DifferentialResult>()),
             Throws.ArgumentException.With.Message.Contains("is a share part"));
+        var two = Toy(new[] { "Ga", "Gb" }, "single", "down");
+        Assert.That(() => RunToy(two), Throws.ArgumentException.With.Message.Contains("is tested as a single but lists 2 members"));
         var notRun = ShareTest.Run(t.Part, t.Part.Contrasts.Single(), new SetContrastSetup { NotRun = "spans_strata" }, t.Resolved, t.Table, t.Sequences, t.Genes);
         Assert.That((notRun.Untested, notRun.UntestedReason), Is.EqualTo((SetVerdictName.NotRun, "spans_strata")));
     }

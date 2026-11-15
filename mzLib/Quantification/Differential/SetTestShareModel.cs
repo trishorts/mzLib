@@ -171,14 +171,7 @@ public static class ShareModel
             Df = fit.SatterthwaiteDf(0, weights),
             DfMethod = "satterthwaite",
             ModelUsed = set ? ShareSetMixedModel : ShareMixedModel,
-            RandomTerms = set
-                ? (structure == RandomStructure.IndividualAndSample ? "sample;sample:member" : "sample")
-                : structure switch
-                {
-                    RandomStructure.IndividualAndSample => "individual;individual:sample",
-                    RandomStructure.Sample => "sample",
-                    _ => "individual",
-                },
+            RandomTerms = RandomTermsOf[(set, structure!.Value)],
             Terms = m,
             Peptides = peptides,
             Observations = n,
@@ -190,6 +183,21 @@ public static class ShareModel
             Weights = Enumerable.Range(0, n).Select(i => new SetValueWeight(memberOf[i], peptideOf[i], sampleOf[i], valueWeights[i])).ToList(),
         };
     }
+
+    /// <summary>
+    /// The random terms each structure means. A set's "sample" is the sample and its "individual" the member term
+    /// (<see cref="SetModel.FitSet"/>'s layout); a single's are STAT1's.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<(bool Set, RandomStructure Structure), string> RandomTermsOf =
+        new Dictionary<(bool, RandomStructure), string>
+        {
+            [(true, RandomStructure.IndividualAndSample)] = "sample;sample:member",
+            [(true, RandomStructure.Individual)] = "sample",
+            [(true, RandomStructure.Sample)] = "sample",
+            [(false, RandomStructure.IndividualAndSample)] = "individual;individual:sample",
+            [(false, RandomStructure.Individual)] = "individual",
+            [(false, RandomStructure.Sample)] = "sample",
+        };
 
     private static string SnakeCase(string name) =>
         string.Concat(name.Select((ch, i) => char.IsUpper(ch) && i > 0 ? "_" + char.ToLowerInvariant(ch) : char.ToLowerInvariant(ch).ToString()));
