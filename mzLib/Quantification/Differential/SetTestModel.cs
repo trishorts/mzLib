@@ -578,8 +578,10 @@ public sealed record SetContrastOutcome
     public required SetDatasetContrast Contrast { get; init; }
     /// <summary>The setup.</summary>
     public required SetContrastSetup Setup { get; init; }
-    /// <summary>Every member of the contrast, with its final state; empty when the contrast is not run.</summary>
+    /// <summary>Every member of the contrast, with its final state; empty when the contrast is not run, and for a share part.</summary>
     public IReadOnlyList<SetMemberResult> Members { get; init; } = Array.Empty<SetMemberResult>();
+    /// <summary>A share part's members (<see cref="ShareTest.Run"/>), with their share states and peptides; empty for a protein part.</summary>
+    public IReadOnlyList<ShareMemberResult> ShareMembers { get; init; } = Array.Empty<ShareMemberResult>();
     /// <summary><see cref="SetVerdictName.NotRun"/> or <see cref="SetVerdictName.NotTestable"/> before any test; null when tested.</summary>
     public string? Untested { get; init; }
     /// <summary>The reason for <see cref="Untested"/>.</summary>
@@ -632,6 +634,8 @@ public static class SetTest
         ArgumentNullException.ThrowIfNull(part);
         ArgumentNullException.ThrowIfNull(contrast);
         ArgumentNullException.ThrowIfNull(setup);
+        if (!string.Equals(part.Measure, SetTestFreeze.ProteinMeasure, StringComparison.Ordinal))
+            throw new ArgumentException($"{part.HypothesisId} {SetTestFreeze.PredictionName(part.Prediction)} is a {part.Measure} part; ShareTest.Run tests it.", nameof(part));
         var outcome = new SetContrastOutcome { Part = part, Contrast = contrast, Setup = setup };
         if (setup.NotRun is not null)
             return outcome with { Untested = SetVerdictName.NotRun, UntestedReason = setup.NotRun };
@@ -691,33 +695,46 @@ public static class SetTest
         }
 
         var test = SetVerdict.Test(part.Prediction, estimate, margin, attenuation, mrnaMean);
+        var (blocked, agree, disagree) = Guards(part.Prediction, members.Select(x => (x.Assignment.Member, x.Assignment.State)));
+        return outcome with { Test = test, BlockedBy = blocked, OneSideAgree = agree, OneSideDisagree = disagree };
+    }
+
+    /// <summary>
+    /// <c>DEF-DIFF-SET-VERDICT</c>'s guards over the members' final states: for up and down, the <c>seen_one_side</c>
+    /// members on the predicted side and the other side; for the no-change kinds, the members that block <c>supported</c>.
+    /// </summary>
+    internal static (List<string> Blocked, int Agree, int Disagree) Guards(SetPrediction prediction,
+        IEnumerable<(string Member, string? State)> members)
+    {
         var blocked = new List<string>();
         int agree = 0, disagree = 0;
-        foreach (var x in members)
+        foreach (var (member, state) in members)
         {
-            string? state = x.Assignment.State;
             bool numeratorOnly = state == SetMemberStateFromRow.SeenNumeratorOnly;
             bool denominatorOnly = state == SetMemberStateFromRow.SeenDenominatorOnly;
-            switch (part.Prediction)
+            switch (prediction)
             {
                 case SetPrediction.Up or SetPrediction.Down:
-                    bool up = part.Prediction == SetPrediction.Up;
+                    bool up = prediction == SetPrediction.Up;
                     if (numeratorOnly) { if (up) agree++; else disagree++; }
                     if (denominatorOnly) { if (up) disagree++; else agree++; }
                     break;
                 case SetPrediction.NotUp:
-                    if (numeratorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(x.Assignment.Member);
+                    if (numeratorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(member);
                     break;
                 case SetPrediction.NotDown:
-                    if (denominatorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(x.Assignment.Member);
+                    if (denominatorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(member);
                     break;
                 default:
-                    if (numeratorOnly || denominatorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(x.Assignment.Member);
+                    if (numeratorOnly || denominatorOnly || state == SetMemberStateFromRow.Incomplete) blocked.Add(member);
                     break;
             }
         }
-        return outcome with { Test = test, BlockedBy = blocked, OneSideAgree = agree, OneSideDisagree = disagree };
+        return (blocked, agree, disagree);
     }
+
+    /// <summary>The one value every member row of a contrast gives for a margin; margins are frozen per hypothesis.</summary>
+    internal static double? OneMargin(IEnumerable<double?> values, string column, SetDatasetContrast contrast) => One(values, column, contrast);
 
     private static double? One(IEnumerable<double?> values, string column, SetDatasetContrast contrast)
     {
