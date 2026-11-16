@@ -1,0 +1,42 @@
+name: W2 Linux proof
+
+# Scratch workflow on the trishorts fork, not for merge. Answers pride's W2 decision Q3 (design/ASPERA.md): does
+# the Aspera transport work on Linux? Installs ascp 4.4.8 the way scratch/aspera-linux-probe proved works (route B,
+# IBM's transfer SDK through aspera-cli), runs every PRIDE offline test (W2's included: the real-process tests use
+# /bin/sh here), then W2's live canary against EBI with the bundled key.
+on:
+  push:
+    branches: [ scratch/w2-linux-proof ]
+  workflow_dispatch:
+
+jobs:
+  w2-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: The bundled key, as checked out
+      run: sha256sum mzLib/UsefulProteomicsDatabases/Resources/aspera_tokenauth_id_rsa
+
+    - name: Install ascp (IBM transfer SDK via aspera-cli)
+      run: |
+        sudo apt-get install -y -qq ruby-full > /dev/null
+        sudo gem install aspera-cli --no-document > /dev/null
+        ascli config ascp install
+        ASCP=$(ascli config ascp show)
+        "$ASCP" -A || true
+        echo "MZLIB_ASCP=$ASCP" >> "$GITHUB_ENV"
+
+    - name: Build
+      run: dotnet build mzLib/PrideLinuxProof/PrideLinuxProof.csproj
+
+    - name: Test (offline, every PRIDE test)
+      run: dotnet test mzLib/PrideLinuxProof/PrideLinuxProof.csproj --no-build --settings mzLib/Test/required.runsettings --logger "console;verbosity=normal"
+
+    - name: Test (live, W2's Aspera canary)
+      if: always()
+      run: dotnet test mzLib/PrideLinuxProof/PrideLinuxProof.csproj --no-build --filter "FullyQualifiedName~PrideAsperaLiveTests" --logger "console;verbosity=detailed"
