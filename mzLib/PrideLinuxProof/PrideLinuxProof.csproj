@@ -17,6 +17,8 @@
   <ItemGroup>
     <Compile Include="../Test/ExternalServiceTestHelper.cs" Link="ExternalServiceTestHelper.cs" />
     <Compile Include="../Test/DatabaseTests/Pride*.cs" LinkBase="DatabaseTests" />
+    <!-- Needs the Readers project; not part of what this proves. -->
+    <Compile Remove="../Test/DatabaseTests/PrideMzIdentMLLiveTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
