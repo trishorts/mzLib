@@ -773,7 +773,7 @@ namespace Readers
                 if (!Takes(column))
                 {
                     notes.Add(new(e.DataFile, e.Column, "", e.Value,
-                        "only characteristics, conditions, fractions, technical replicates and source names are taken from evidence"));
+                        "only characteristics, conditions, fractions, technical replicates, plexes and source names are taken from evidence"));
                     continue;
                 }
                 if (e.DataFilePattern.Length > 0)
@@ -886,6 +886,26 @@ namespace Readers
                         case "source name":
                             if (Fill(r.SourceName) is { } name) r = r with { SourceName = name };
                             break;
+                        case "comment[plex]":
+                            // A plex is the set of labelled samples one run carries (sdrf PXR-F15 P2), so only a labelled run
+                            // takes one. Its fractions and injections carry the same samples, so a channel nothing names is
+                            // named by its plex, as MetaMorpheus names one (Plex1 126).
+                            if (row.Label == null || row.Plex == null)
+                                notes.Add(new(row.DataFile, column, "", cell.Value, "only a labelled run has a plex"));
+                            else if (Fill(row.Plex) is { } plex)
+                            {
+                                r = r with { Plex = plex };
+                                if (r.SourceName.Source == SdrfDraftSource.Default && r.Label!.Source != SdrfDraftSource.NotAvailable)
+                                    r = r with
+                                    {
+                                        SourceName = r.SourceName with
+                                        {
+                                            Value = $"{plex.Value} {r.Label.Value}",
+                                            Evidence = $"nothing names the sample on channel {r.Label.Value} of plex {plex.Value}"
+                                        }
+                                    };
+                            }
+                            break;
                         case "characteristics[organism]":
                             notes.Add(new(row.DataFile, column, r.Organism.Value, cell.Value, "the organism is written as a term, so free text from evidence is not applied"));
                             break;
@@ -902,7 +922,7 @@ namespace Readers
         /// <summary>The columns evidence may fill.</summary>
         private static bool Takes(string column) =>
             column.StartsWith("characteristics[", StringComparison.Ordinal) || column.StartsWith("factor value[", StringComparison.Ordinal)
-            || column is "comment[fraction identifier]" or "comment[technical replicate]" or "source name";
+            || column is "comment[fraction identifier]" or "comment[technical replicate]" or "comment[plex]" or "source name";
 
         private static SdrfDraftCell EvidenceCell(SdrfEvidence claim, string value) =>
             new(value, claim.Source switch
