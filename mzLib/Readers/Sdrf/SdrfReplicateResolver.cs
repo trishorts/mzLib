@@ -194,6 +194,56 @@ namespace Readers
                 one ? $"the record says '{single}' and states no biological replicates" : "");
         }
 
+        /// <summary>The numbers of fractions the record states: "separated into 12 fractions", "twelve high-pH fractions".</summary>
+        internal static HashSet<int> StatedFractions(IEnumerable<string?> recordText)
+        {
+            if (recordText == null) throw new ArgumentNullException(nameof(recordText));
+            return Counts(string.Join(" \n ", recordText.Where(t => !string.IsNullOrWhiteSpace(t))), Fractions);
+        }
+
+        private static readonly Regex DigitRun = new(@"\d+", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Each file's fraction, read from ONE number in the names that counts fractions the record states (sdrf PXR-F15 P2).
+        /// The number need not follow a word or end the name: PXD004683's <c>TMT1-bRPLC01-2</c> is fraction 1 of injection 2.
+        /// Every name has the same count of numbers, and leaving out one of them groups the files so that each group is
+        /// numbered exactly 1..n, where <paramref name="statedFractions"/> holds n. Null unless exactly one number does that:
+        /// two that do are two readings of the names, and nothing chooses between them.
+        /// </summary>
+        internal static (IReadOnlyDictionary<string, int> Fractions, int Count)? FractionRun(IReadOnlyCollection<string> fileNames,
+            IReadOnlyCollection<int> statedFractions)
+        {
+            if (fileNames == null) throw new ArgumentNullException(nameof(fileNames));
+            if (statedFractions == null) throw new ArgumentNullException(nameof(statedFractions));
+            if (fileNames.Count < 2 || statedFractions.Count == 0) return null;
+            var names = fileNames.Select(n => (Name: n, Stem: SdrfFileNamePattern.Stem(n))).Select(x => (x.Name, x.Stem, Runs: DigitRun.Matches(x.Stem))).ToList();
+            int k = names[0].Runs.Count;
+            if (k == 0 || names.Any(x => x.Runs.Count != k)) return null;
+
+            (IReadOnlyDictionary<string, int> Fractions, int Count)? found = null;
+            for (int i = 0; i < k; i++)
+            {
+                var groups = new Dictionary<string, List<(string Name, int Value)>>(StringComparer.Ordinal);
+                bool numbers = true;
+                foreach (var x in names)
+                {
+                    var run = x.Runs[i];
+                    if (!int.TryParse(run.Value, NumberStyles.None, CultureInfo.InvariantCulture, out int value)) { numbers = false; break; }
+                    string rest = x.Stem.Substring(0, run.Index) + "#" + x.Stem.Substring(run.Index + run.Length);
+                    if (!groups.TryGetValue(rest, out var group)) groups[rest] = group = new();
+                    group.Add((x.Name, value));
+                }
+                if (!numbers) continue;
+                int n = groups.Values.First().Count;
+                if (n < 2 || !statedFractions.Contains(n)) continue;
+                if (groups.Values.Any(g => g.Count != n || !g.Select(v => v.Value).OrderBy(v => v).SequenceEqual(Enumerable.Range(1, n))))
+                    continue;
+                if (found != null) return null;
+                found = (groups.Values.SelectMany(g => g).ToDictionary(v => v.Name, v => v.Value, StringComparer.Ordinal), n);
+            }
+            return found;
+        }
+
         private sealed record Marker(string Base, int? Rank, SdrfReplicateKind WordKind = SdrfReplicateKind.Unstated);
 
         /// <summary>

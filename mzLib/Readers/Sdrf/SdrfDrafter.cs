@@ -186,9 +186,11 @@ namespace Readers
         /// keeps one row, and its label is <c>not available</c>, not <c>label free</c>.</para>
         ///
         /// <para><b>Nothing a design needs is guessed</b> (PXReprise's rule: identity from evidence, never from numbering).
-        /// The plex, the fraction and the technical replicate are <c>not available</c>: <c>F01</c> in a name is a number,
-        /// not a statement that the file is a fraction of the plex another file belongs to. A cell the drafter read from a
-        /// file name is <c>not available</c> on its channels, because the name describes the run, not one channel's sample.
+        /// The plex and the technical replicate are <c>not available</c>, and so is the fraction unless the record states
+        /// how many fractions there are and a number in the names counts them (<see cref="FractionsTheRecordStates"/>):
+        /// <c>F01</c> alone is a number, not a statement that the file is a fraction of the plex another file belongs to. Any
+        /// other cell the drafter read from a file name is <c>not available</c> on its channels, because the name describes
+        /// the run, not one channel's sample.
         /// A channel nothing names is <c>&lt;file stem&gt; &lt;label&gt;</c>, numbered as MetaMorpheus numbers a name another
         /// row already uses (<c>S1 TMT126 (2)</c>), and its biological replicate is 1 marked <c>default</c>, which
         /// QuantProject's reader refuses (their QP-S48). Exactly <c>not available</c> in <c>comment[plex]</c> is refused too.</para>
@@ -199,8 +201,9 @@ namespace Readers
         {
             if (draft.Rows.Count == 0) return draft;
             var notes = new List<SdrfEvidenceNote>();
-            var text = string.Join("\n", new[] { record.Title, record.Description, record.SampleProcessingProtocol, record.DataProcessingProtocol }
-                .Concat(record.Keywords).Concat(record.ProjectTags));
+            var parts = new[] { record.Title, record.Description, record.SampleProcessingProtocol, record.DataProcessingProtocol }
+                .Concat(record.Keywords).Concat(record.ProjectTags).ToList();
+            var text = string.Join("\n", parts);
             var fromRecord = SdrfIsobaricKit.Read(text);
 
             var claims = new List<SdrfEvidence>();
@@ -273,6 +276,7 @@ namespace Readers
                         : (null, SdrfDraftCell.NotAvailable($"{record.TextName} names '{fromRecord.Quote}', which states no one kit, with its size, for every run, so no channel is drafted"));
             }
             if (kitOf.Count == 0) return notes.Count == 0 ? draft : draft with { EvidenceNotes = draft.EvidenceNotes.Concat(notes).ToList() };
+            var fractionOf = FractionsTheRecordStates(draft, kitOf, parts, record);
 
             // ---- rows ----
             SdrfDraftCell Run(SdrfDraftCell c) => c.Source == SdrfDraftSource.Inferred ? SdrfDraftCell.NotAvailable(RunNotChannel) : c;
@@ -288,7 +292,8 @@ namespace Readers
                     Disease = Run(row.Disease),
                     BiologicalReplicate = new SdrfDraftCell("1", SdrfDraftSource.Default, "nothing names this channel's sample, so no replicate is claimed"),
                     TechnicalReplicate = SdrfDraftCell.NotAvailable("nothing states which runs repeat one injection of a plex"),
-                    Fraction = SdrfDraftCell.NotAvailable("nothing states which runs are fractions of one plex; a number in a file name is not a statement"),
+                    Fraction = fractionOf.TryGetValue(row.DataFile, out var fraction) ? fraction
+                        : SdrfDraftCell.NotAvailable("nothing states which runs are fractions of one plex; a number in a file name is not a statement"),
                     Factors = row.Factors.Select(Run).ToList(),
                     Characteristics = row.Characteristics.ToDictionary(kv => kv.Key, kv => Run(kv.Value), StringComparer.Ordinal),
                     Plex = SdrfDraftCell.NotAvailable("nothing states which runs carry one set of labelled samples")
@@ -325,6 +330,52 @@ namespace Readers
                 rows[i] = rows[i] with { SourceName = rows[i].SourceName with { Value = $"{name} ({n})" } };
             }
             return draft with { Rows = rows, EvidenceNotes = draft.EvidenceNotes.Concat(notes).ToList() };
+        }
+
+        /// <summary>
+        /// The fraction of each labelled run, read from its name only where the record states that many fractions (sdrf
+        /// PXR-F15 P2: a name pattern counts only where evidence states it). A fraction a word in the names marks
+        /// (<c>F01</c>, <c>fr12</c>, <c>Fraction_3</c>) stands when the largest is a count the record states. Else one number
+        /// that counts every group of runs exactly 1..n, n stated, is the fraction
+        /// (<see cref="SdrfReplicateResolver.FractionRun"/>). A number is never renumbered into a fraction: runs counted in
+        /// acquisition order are not fractions in that order. Nothing here says which runs are one plex: a group of
+        /// fractions is one injection, and PXD004683's four groups are two plexes, each injected twice.
+        /// </summary>
+        private static Dictionary<string, SdrfDraftCell> FractionsTheRecordStates(SdrfDraft draft,
+            IReadOnlyDictionary<string, (IsobaricMassTagType? Kit, SdrfDraftCell Cell)> labelled, IReadOnlyList<string> text, SdrfDepositRecord record)
+        {
+            var result = new Dictionary<string, SdrfDraftCell>(StringComparer.Ordinal);
+            var stated = SdrfReplicateResolver.StatedFractions(text);
+            if (stated.Count == 0) return result;
+            static string Number(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            // Only a fraction a word marks, as both readers keep it, never a run the record's count made one: the label-free
+            // reading numbers PXD005236's Fusion_160519_70..77 as fractions 1..8 in acquisition order, and its curated
+            // fractions are 7, 1, 8 and so on. With no record text the resolver reads only what a name's own word says.
+            var names = draft.Rows.Select(r => r.DataFile).Distinct(StringComparer.Ordinal).ToList();
+            var pattern = SdrfFileNamePattern.Read(names).Files.Where(f => f.Fraction != null)
+                .ToDictionary(f => f.FileName, f => f.Fraction!.Value, StringComparer.Ordinal);
+            var worded = SdrfReplicateResolver.Read(names, Array.Empty<string>()).Files
+                .Where(f => f.Kind == SdrfReplicateKind.Fraction && f.Number != null)
+                .ToDictionary(f => f.FileName, f => f.Number!.Value, StringComparer.Ordinal);
+            var marked = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var name in names.Where(labelled.ContainsKey))
+                if (pattern.TryGetValue(name, out int f) || worded.TryGetValue(name, out f))
+                    marked[name] = f;
+            if (marked.Count > 0 && stated.Contains(marked.Values.Max()))
+            {
+                int n = marked.Values.Max();
+                foreach (var (file, f) in marked)
+                    result[file] = new(Number(f), SdrfDraftSource.Inferred, $"{record.TextName} states {n} fractions, and the file names mark each run's fraction");
+                return result;
+            }
+
+            if (SdrfReplicateResolver.FractionRun(names, stated) is { } run)
+                foreach (var (file, f) in run.Fractions)
+                    if (labelled.ContainsKey(file))
+                        result[file] = new(Number(f), SdrfDraftSource.Inferred,
+                            $"{record.TextName} states {run.Count} fractions, and one number in the file names counts every group of runs 1..{run.Count}");
+            return result;
         }
 
         /// <summary>

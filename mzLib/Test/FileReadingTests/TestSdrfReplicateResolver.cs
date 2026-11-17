@@ -251,11 +251,56 @@ namespace Test.FileReadingTests
             Assert.That(File(r, "KO_16").Number, Is.EqualTo(16));
         }
 
+        // ---- a fraction counted by one number in the names, the count stated (sdrf PXR-F15 P2) ----
+
+        [TestCase("Peptides were separated into 12 fractions.", 12)]
+        [TestCase("Twelve concatenated fractions were collected.", 12)]
+        [TestCase("pooled into 20 fractions, desalted", 20)]
+        public void AStatedFractionCountIsRead(string text, int count)
+        {
+            Assert.That(SdrfReplicateResolver.StatedFractions(new[] { "TMT10plex", text }), Is.EquivalentTo(new[] { count }));
+        }
+
+        /// <summary>PXD033778's <c>P140561_1_10</c>: sample 1, fraction 10 of the 20 its record states.</summary>
+        [Test]
+        public void TheOneNumberCountingEveryGroupToTheStatedCountIsTheFraction()
+        {
+            var names = (from s in new[] { 1, 2 } from f in Enumerable.Range(1, 20) select $"P140561_{s}_{f}.wiff").ToList();
+
+            var run = SdrfReplicateResolver.FractionRun(names, new[] { 20 });
+
+            Assert.That(run, Is.Not.Null);
+            Assert.That(run!.Value.Count, Is.EqualTo(20));
+            Assert.That(run.Value.Fractions["P140561_2_7.wiff"], Is.EqualTo(7));
+            Assert.That(SdrfReplicateResolver.FractionRun(names, new[] { 2, 20 }), Is.Null,
+                "with 2 stated as well, the sample number also counts every group 1..2: two readings, and nothing chooses");
+        }
+
+        [TestCase("A_1,A_2,B_1,B_2_3", Description = "names with different counts of numbers")]
+        [TestCase("S1_F1,S1_F2,S1_F3,S2_F1,S2_F2", Description = "a group short of the count")]
+        [TestCase("S1_F2,S1_F3,S1_F4", Description = "a group that does not start at 1")]
+        [TestCase("Run_99999999999_1,Run_99999999998_2", Description = "a number too long to be a fraction, and no group")]
+        [TestCase("Alpha,Beta", Description = "no number at all")]
+        [TestCase("S1_F1", Description = "one file")]
+        public void NamesThatDoNotCountTheStatedFractionsGiveNone(string names)
+        {
+            Assert.That(SdrfReplicateResolver.FractionRun(names.Split(','), new[] { 2, 3 }), Is.Null);
+        }
+
+        [Test]
+        public void NoStatedCountGivesNone()
+        {
+            Assert.That(SdrfReplicateResolver.FractionRun(new[] { "S_1", "S_2" }, Array.Empty<int>()), Is.Null);
+        }
+
         [Test]
         public void MalformedArgumentsThrow()
         {
             Assert.Throws<ArgumentNullException>(() => SdrfReplicateResolver.Read(null!, Array.Empty<string>()));
             Assert.Throws<ArgumentNullException>(() => SdrfReplicateResolver.Read(new[] { "a" }, null!));
+            Assert.Throws<ArgumentNullException>(() => SdrfReplicateResolver.StatedFractions(null!));
+            Assert.Throws<ArgumentNullException>(() => SdrfReplicateResolver.FractionRun(null!, new[] { 2 }));
+            Assert.Throws<ArgumentNullException>(() => SdrfReplicateResolver.FractionRun(new[] { "a" }, null!));
         }
     }
 }

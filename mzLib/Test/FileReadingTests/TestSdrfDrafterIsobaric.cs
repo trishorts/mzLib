@@ -15,7 +15,8 @@ namespace Test.FileReadingTests
     /// label free with one row per file, so every TMT draft was wrong in kind. A drafted isobaric SDRF states the kit only
     /// from evidence or the record's own words, one row per file and channel, and says <c>not available</c> for everything
     /// a design needs that nothing states: the plex, the fraction, the technical replicate, and each channel's sample.
-    /// QuantProject's readers then refuse the design instead of guessing it (their QP-S48, 2026-11-16).
+    /// QuantProject's readers then refuse the design instead of guessing it (their QP-S48, 2026-11-16). A fraction is read
+    /// from the file names only where the record states that many fractions (P2).
     /// </summary>
     [TestFixture]
     [ExcludeFromCodeCoverage]
@@ -108,6 +109,86 @@ namespace Test.FileReadingTests
                 if (doc.Header.Contains("comment[fraction identifier source]"))
                     Assert.That(row["comment[fraction identifier source]"], Is.Not.EqualTo("inferred"), "a value nobody states has no source");
             }
+        }
+
+        /// <summary>PXR-F15 P2: a number in a file name is a fraction where the record states that many fractions. Every
+        /// channel of the run carries it. The plex and the technical replicate stay not available: a group of fractions is
+        /// one injection, and PXD004683's four groups are two plexes, each injected twice.</summary>
+        [TestCase("Peptides were separated into 12 fractions.")]
+        [TestCase("Twelve concatenated fractions were collected.")]
+        public void AFractionTheRecordStatesIsWrittenOnEveryChannelOfTheRun(string stated)
+        {
+            var files = Enumerable.Range(1, 12).Select(i => $"Plex1_F{i:00}.raw").ToArray();
+            var d = SdrfDrafter.Draft(Project("Peptides were labelled with TMT10plex reagents. " + stated), files);
+
+            for (int i = 1; i <= 12; i++)
+            {
+                var run = Of(d, files[i - 1]).ToList();
+                Assert.That(run, Has.Count.EqualTo(10));
+                Assert.That(run.Select(r => r.Fraction.Value), Is.All.EqualTo(i.ToString()), files[i - 1]);
+                Assert.That(run.All(r => r.Fraction.Source == SdrfDraftSource.Inferred));
+            }
+            Assert.That(d.Rows[0].Fraction.Evidence, Does.Contain("states 12 fractions"));
+            Assert.That(d.Rows.All(r => r.Plex!.Source == SdrfDraftSource.NotAvailable), "a group of fractions is one injection, not a plex");
+            Assert.That(d.Rows.All(r => r.TechnicalReplicate.Source == SdrfDraftSource.NotAvailable));
+
+            var written = Written(SdrfDrafter.ToDocument(d), "Plex1_F03.raw").ToList();
+            Assert.That(written.Select(r => r["comment[fraction identifier]"]), Is.All.EqualTo("3"));
+            Assert.That(written.Select(r => r["comment[fraction identifier source]"]), Is.All.EqualTo("inferred"));
+            Assert.That(written.Select(r => r["comment[plex]"]), Is.All.EqualTo("not available"));
+        }
+
+        /// <summary>The fraction need not follow a word or end the name. PXD004683's <c>TMT1-bRPLC01-2</c> is fraction 1 of
+        /// plex 1, injection 2: leaving that one number out groups the files so that each group counts 1 to 12, the twelve
+        /// fractions the record states.</summary>
+        [Test]
+        public void ANumberCountingEveryGroupToTheStatedFractionsIsTheFraction()
+        {
+            var files = (from plex in new[] { 1, 2 } from f in Enumerable.Range(1, 12) from inj in new[] { 1, 2 }
+                         select $"Pilot-TMT{plex}-bRPLC{f:00}-{inj}.raw").ToArray();
+            var d = SdrfDrafter.Draft(Project("Labelled with TMT10plex reagents. Twelve concatenated fractions were collected."), files);
+
+            Assert.That(Of(d, "Pilot-TMT2-bRPLC07-1.raw").Select(r => r.Fraction.Value), Is.All.EqualTo("7"));
+            Assert.That(Of(d, "Pilot-TMT1-bRPLC12-2.raw").Select(r => r.Fraction.Value), Is.All.EqualTo("12"));
+            Assert.That(d.Rows[0].Fraction.Evidence, Does.Contain("one number in the file names"));
+            Assert.That(d.Rows.All(r => r.Plex!.Source == SdrfDraftSource.NotAvailable));
+            Assert.That(d.Rows.All(r => r.TechnicalReplicate.Source == SdrfDraftSource.NotAvailable), "the -1/-2 is not stated");
+        }
+
+        /// <summary>Without a stated count that a number in the names matches, nothing says the runs are fractions.</summary>
+        [TestCase("Peptides were separated into 8 fractions.")]
+        [TestCase("Peptides were fractionated by high-pH reversed phase.")]
+        public void AFractionNumberTheRecordDoesNotCountStaysNotAvailable(string said)
+        {
+            var files = Enumerable.Range(1, 12).Select(i => $"Plex1_F{i:00}.raw").ToArray();
+            var d = SdrfDrafter.Draft(Project("Peptides were labelled with TMT10plex reagents. " + said), files);
+
+            Assert.That(d.Rows, Has.Count.EqualTo(120));
+            Assert.That(d.Rows.All(r => r.Fraction.Source == SdrfDraftSource.NotAvailable));
+        }
+
+        /// <summary>A run counter is not a fraction, even when the record states as many fractions as there are runs.
+        /// PXD005236's record says "Eight fractions were collected" and its runs are <c>Fusion_160519_70..77</c>; its curated
+        /// fractions are 7, 1, 8 and so on, so numbering the runs 1..8 in acquisition order would be a guess.</summary>
+        [Test]
+        public void ARunCounterIsNotRenumberedIntoFractions()
+        {
+            var files = Enumerable.Range(70, 8).Select(i => $"Fusion_160519_{i}.raw").ToArray();
+            var d = SdrfDrafter.Draft(Project("Labelled with TMT10plex reagents. Eight fractions were collected."), files);
+
+            Assert.That(d.Rows, Has.Count.EqualTo(80));
+            Assert.That(d.Rows.All(r => r.Fraction.Source == SdrfDraftSource.NotAvailable), d.Rows[0].Fraction.Evidence);
+        }
+
+        /// <summary>Two numbers that each count every group 1..n are two readings of the names, and nothing chooses.</summary>
+        [Test]
+        public void TwoNumbersThatCountTheStatedFractionsStateNone()
+        {
+            var files = new[] { "Set1_Cut1_x.raw", "Set1_Cut2_x.raw", "Set2_Cut1_x.raw", "Set2_Cut2_x.raw" };
+            var d = SdrfDrafter.Draft(Project("Labelled with TMT10plex reagents and separated into two fractions."), files);
+
+            Assert.That(d.Rows, Has.Count.EqualTo(40));
+            Assert.That(d.Rows.All(r => r.Fraction.Source == SdrfDraftSource.NotAvailable));
         }
 
         /// <summary>QP-S48 (b): QuantProject's reader reads any source name as a real sample, and refuses a channel only by
