@@ -180,6 +180,76 @@ namespace Test.FileReadingTests
             Assert.That(d.Rows.All(r => r.Fraction.Source == SdrfDraftSource.NotAvailable), d.Rows[0].Fraction.Evidence);
         }
 
+        private static SdrfEvidence Plex(string file, string value, SdrfEvidenceConfidence confidence = SdrfEvidenceConfidence.Certain) =>
+            new(file, "", "comment[plex]", value, "deposit", "txt/summary.txt Experiment", "design-table", confidence);
+
+        private static readonly string[] TwoPlexes = { "Plex1_F01.raw", "Plex1_F02.raw", "Plex2_F01.raw", "Plex2_F02.raw" };
+
+        /// <summary>PXR-F15 P2: a plex comes from evidence only, here MaxQuant's Experiment for each run (in a TMT search,
+        /// the runs of one experiment are the fractions of one plex). Every channel of the run carries it.</summary>
+        [Test]
+        public void APlexClaimIsWrittenOnEveryChannelOfTheRun()
+        {
+            var claims = TwoPlexes.Select(f => Plex(f, f.StartsWith("Plex1") ? "A" : "B")).ToList();
+            var d = SdrfDrafter.Draft(Project(Tmt10), TwoPlexes, claims);
+
+            Assert.That(Of(d, "Plex1_F02.raw").Select(r => r.Plex!.Value), Is.All.EqualTo("A"));
+            Assert.That(Of(d, "Plex2_F01.raw").Select(r => r.Plex!.Value), Is.All.EqualTo("B"));
+            Assert.That(d.Rows.All(r => r.Plex!.Source == SdrfDraftSource.Deposit));
+
+            var written = Written(SdrfDrafter.ToDocument(d), "Plex2_F02.raw").ToList();
+            Assert.That(written, Has.Count.EqualTo(10));
+            Assert.That(written.Select(r => r["comment[plex]"]), Is.All.EqualTo("B"));
+            Assert.That(written.Select(r => r["comment[plex source]"]), Is.All.EqualTo("deposited"));
+        }
+
+        /// <summary>The fractions of one plex carry the same samples, so a channel nothing names is named by its plex, as
+        /// MetaMorpheus names one (<c>Plex1 126</c>): TMT126 in both fractions of plex A is one sample. Its biological
+        /// replicate stays <c>default</c>, because nothing names that sample.</summary>
+        [Test]
+        public void AChannelNothingNamesIsNamedByItsPlex()
+        {
+            var claims = TwoPlexes.Select(f => Plex(f, f.StartsWith("Plex1") ? "A" : "B")).ToList();
+            var d = SdrfDrafter.Draft(Project(Tmt10), TwoPlexes, claims);
+
+            string Name(string file, string label) => Of(d, file).Single(r => r.Label!.Value == label).SourceName.Value;
+            Assert.That(Name("Plex1_F01.raw", "TMT126"), Is.EqualTo("A TMT126"));
+            Assert.That(Name("Plex1_F02.raw", "TMT126"), Is.EqualTo("A TMT126"), "one sample in both fractions");
+            Assert.That(Name("Plex2_F01.raw", "TMT131"), Is.EqualTo("B TMT131"));
+            Assert.That(d.Rows.All(r => r.SourceName.Source == SdrfDraftSource.Default));
+            Assert.That(d.Rows.All(r => r.BiologicalReplicate.Source == SdrfDraftSource.Default));
+        }
+
+        /// <summary>A claim about the whole deposit makes every labelled run one plex; a claim about a file beats it.</summary>
+        [Test]
+        public void ADepositWidePlexClaimMakesEveryRunOnePlex()
+        {
+            var d = SdrfDrafter.Draft(Project(Tmt10), TwoPlexes, new[] { Plex("", "1"), Plex("Plex2_F02.raw", "2") });
+
+            Assert.That(Of(d, "Plex1_F01.raw").Select(r => r.Plex!.Value), Is.All.EqualTo("1"));
+            Assert.That(Of(d, "Plex2_F02.raw").Select(r => r.Plex!.Value), Is.All.EqualTo("2"));
+        }
+
+        [Test]
+        public void PlexClaimsThatDisagreeStateNone()
+        {
+            var d = SdrfDrafter.Draft(Project(Tmt10), TwoPlexes, new[] { Plex("Plex1_F01.raw", "A"), Plex("Plex1_F01.raw", "B") });
+
+            Assert.That(Of(d, "Plex1_F01.raw").All(r => r.Plex!.Source == SdrfDraftSource.NotAvailable));
+            Assert.That(Of(d, "Plex1_F01.raw").Select(r => r.SourceName.Value), Has.Some.EqualTo("Plex1_F01 TMT126"));
+            Assert.That(d.EvidenceNotes.Select(n => n.Why), Has.Some.Contains("disagree"));
+        }
+
+        /// <summary>A plex is the set of labelled samples one run carries: a label-free run has none.</summary>
+        [Test]
+        public void APlexClaimOnALabelFreeRunIsNotApplied()
+        {
+            var d = SdrfDrafter.Draft(Project("Label-free quantification of liver lysates."), new[] { "S1.raw" }, new[] { Plex("S1.raw", "A") });
+
+            Assert.That(d.Rows.Single().Plex, Is.Null);
+            Assert.That(d.EvidenceNotes.Select(n => n.Why), Has.Some.Contains("only a labelled run has a plex"));
+        }
+
         /// <summary>Two numbers that each count every group 1..n are two readings of the names, and nothing chooses.</summary>
         [Test]
         public void TwoNumbersThatCountTheStatedFractionsStateNone()
